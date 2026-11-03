@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import Image from "next/image";
 
 const navigation = [
-  { href: "/", label: "＋ 分析程式碼" },
+  { href: "/", label: "分析程式碼", prefix: "＋" },
   { href: "/dictionary", label: "語法辭典" },
   { href: "/statistics", label: "常用語法" },
   { href: "/records", label: "程式碼紀錄" },
@@ -75,7 +75,8 @@ export default function SiteShell({ children }: { children: ReactNode }) {
               disabled
               title="會員功能開發中"
             >
-              登入／註冊
+              <span className="account-label-desktop">登入／註冊</span>
+              <span className="account-label-mobile">登入</span>
             </button>
           </div>
         </div>
@@ -94,6 +95,9 @@ export default function SiteShell({ children }: { children: ReactNode }) {
                   className={`sidebar-link${isActive ? " is-active" : ""}`}
                   aria-current={isActive ? "page" : undefined}
                 >
+                  <span className="sidebar-prefix" aria-hidden="true">
+                    {item.prefix}
+                  </span>
                   {item.label}
                 </Link>
               );

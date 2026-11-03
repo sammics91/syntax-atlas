@@ -24,7 +24,7 @@
   --selected-bg: #e8ece8;
 
   --site-width: 1200px;
-  --sidebar-width: 200px;
+  --sidebar-width: 210px;
 }
 
 * {
@@ -97,6 +97,8 @@ button:focus-visible {
   font-family: Georgia, "Times New Roman", serif;
   font-size: 26px;
   font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .brand-symbol {
@@ -134,6 +136,10 @@ button:focus-visible {
   opacity: 0.65;
 }
 
+.account-label-mobile {
+  display: none;
+}
+
 /*-- 主體：置中容器與捲軸寬度補償 --*/
 .site-body {
   width: min(var(--site-width), calc(100vw - var(--scrollbar-width, 0px)));
@@ -150,7 +156,7 @@ button:focus-visible {
 /*-- 左側選單 --*/
 .site-sidebar {
   padding-top: 12px;
-  padding-bottom: 25px;
+  padding-bottom: 10px;
   border-right: 1px solid var(--border);
 }
 
@@ -158,12 +164,12 @@ button:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 0px;
-  padding-inline: 12px;
+  padding-inline: 0px;
   padding-right: 0;
 }
 
 .sidebar-link {
-  padding: 15px 19px;
+  padding: 15px 19px 15px 31px;
   border-radius: 3px;
   line-height: 1.5;
 }
@@ -176,6 +182,10 @@ button:focus-visible {
   background: var(--selected-bg);
   color: var(--primary);
   font-weight: 700;
+}
+
+.sidebar-prefix {
+  margin-right: 2px;
 }
 
 /*-- 右側內容 --*/
@@ -233,6 +243,118 @@ button:focus-visible {
   opacity: 0.7;
 }
 
-/*-- 手機版：依頁首、主體、側欄、內容、頁尾排列 --*/
+/*-- 平板與手機裝置：依頁首、主體、側欄、內容、頁尾排列 --*/
+
+/* 平板窄版：保留左側欄，縮小寬度 */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .site-body {
+    --sidebar-width: 160px;
+  }
+
+  .sidebar-link {
+    padding: 15px 19px;
+  }
+}
+
+/* 手機（640px 以下）*/
 @media (max-width: 640px) {
+  .header-inner {
+    padding: 6px 16px;
+    gap: 12px;
+  }
+
+  .site-brand {
+    gap: 4px;
+    font-size: 22px;
+  }
+
+  .site-heading {
+    gap: 10px;
+  }
+
+  .site-account {
+    gap: 10px;
+  }
+
+  .login-button {
+    padding: 6px 10px;
+    font-size: 14px;
+    white-space: nowrap;
+  }
+
+  .site-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+  }
+
+  .site-sidebar {
+    min-width: 0;
+    padding: 0;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    overflow: visible;
+  }
+
+  .sidebar-nav {
+    display: flex;
+    flex-direction: row;
+    gap: 0;
+    padding: 0;
+  }
+
+  .sidebar-link {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 12px 4px;
+    border-radius: 0;
+    font-size: 13px;
+    line-height: 20px;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .sidebar-prefix {
+    display: inline;
+  }
+
+  .page-content {
+    padding: 16px;
+  }
+
+  .footer-inner {
+    padding-inline: 16px;
+  }
+}
+
+/*-- 窄螢幕：簡化頁首 --*/
+@media (max-width: 440px) {
+  .header-inner {
+    padding-inline: 12px;
+    gap: 8px;
+  }
+
+  .site-tagline {
+    display: none;
+  }
+
+  .account-name {
+    display: none;
+  }
+
+  .account-label-desktop {
+    display: none;
+  }
+
+  .account-label-mobile {
+    display: block;
+    max-width: 88px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .sidebar-prefix {
+    display: inline;
+    margin-right: 0;
+  }
 }
