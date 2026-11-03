@@ -74,9 +74,9 @@ button:focus-visible {
 .header-inner {
   width: 100%;
   max-width: none;
-  min-height: 49px;
+  min-height: 41px;
   margin-inline: 0;
-  padding: 11px 25px;
+  padding: 9px 25px;
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -155,7 +155,7 @@ button:focus-visible {
 
 /*-- 左側選單 --*/
 .site-sidebar {
-  padding-top: 12px;
+  padding-top: 19px;
   padding-bottom: 10px;
   border-right: 1px solid var(--border);
 }
@@ -191,20 +191,20 @@ button:focus-visible {
 /*-- 右側內容 --*/
 .page-content {
   min-width: 0;
-  padding: 19px 32px 36px;
+  padding: 26px 32px;
   overflow-wrap: anywhere;
 }
 
 .page-title {
-  margin: 0 0 12px;
+  margin: 0 9px 5px;
   font-size: 28px;
   font-weight: 700;
 }
 
 .page-description {
-  margin: 0;
+  margin: 0 9px;
   color: var(--text-muted);
-  line-height: 1.8;
+  line-height: 1.5;
 }
 
 /*-- 頁尾資訊與 GitHub 連結 --*/
