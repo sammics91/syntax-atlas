@@ -136,16 +136,11 @@ button:focus-visible {
 
 /*-- 主體：置中容器與捲軸寬度補償 --*/
 .site-body {
-  width: min(
-    var(--site-width),
-    calc(100vw - var(--scrollbar-width, 0px))
-  );
+  width: min(var(--site-width), calc(100vw - var(--scrollbar-width, 0px)));
   max-width: none;
   margin-left: max(
     0px,
-    calc(
-      (100vw - var(--scrollbar-width, 0px) - var(--site-width)) / 2
-    )
+    calc((100vw - var(--scrollbar-width, 0px) - var(--site-width)) / 2)
   );
   margin-right: 0;
   display: grid;
