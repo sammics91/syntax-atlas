@@ -1,26 +1,243 @@
 @import "tailwindcss";
 
+/*-- 全域變數與基本樣式 --*/
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --page-bg: #f6f7f5;
+  --surface: #ffffff;
+
+  --accent-light: #eabf58;
+  --accent: #c5a454;
+  --accent-on-green: #a68b4a;
+
+  --border: #daddd9;
+  --soft-bg: #e8ece8;
+
+  --primary: #24545a;
+
+  --text: #182326;
+  --text-muted: #666d6b;
+
+  --chart-gray: #b8b7ad;
+  --error: #b42318;
+
+  --selected-bg: #e8ece8;
+
+  --site-width: 1200px;
+  --sidebar-width: 200px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+* {
+  box-sizing: border-box;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  min-height: 100%;
+  overflow-y: auto;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+  background: var(--page-bg);
+  color: var(--text);
+  font-family: Arial, "Microsoft JhengHei", sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font: inherit;
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 4px;
+}
+
+/*-- 整體框架 --*/
+.site-shell {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+}
+
+/*-- 頁首：橫幅、標題、登入按鈕 --*/
+.site-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.header-inner {
+  width: 100%;
+  max-width: none;
+  min-height: 49px;
+  margin-inline: 0;
+  padding: 11px 25px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.site-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 11px;
+  min-width: 0;
+}
+
+.site-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.brand-symbol {
+  color: var(--accent);
+}
+
+.site-tagline {
+  color: var(--text-muted);
+  font-size: 16px;
+  white-space: nowrap;
+}
+
+.site-account {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  flex-shrink: 0;
+}
+
+.account-name {
+  font-size: 14px;
+}
+
+.login-button {
+  flex-shrink: 0;
+  padding: 9px 16px 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.login-button:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+
+/*-- 主體：置中容器與捲軸寬度補償 --*/
+.site-body {
+  width: min(
+    var(--site-width),
+    calc(100vw - var(--scrollbar-width, 0px))
+  );
+  max-width: none;
+  margin-left: max(
+    0px,
+    calc(
+      (100vw - var(--scrollbar-width, 0px) - var(--site-width)) / 2
+    )
+  );
+  margin-right: 0;
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+}
+
+/*-- 左側選單 --*/
+.site-sidebar {
+  padding-top: 12px;
+  padding-bottom: 25px;
+  border-right: 1px solid var(--border);
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0px;
+  padding-inline: 12px;
+  padding-right: 0;
+}
+
+.sidebar-link {
+  padding: 15px 19px;
+  border-radius: 3px;
+  line-height: 1.5;
+}
+
+.sidebar-link:hover {
+  background: var(--surface);
+}
+
+.sidebar-link.is-active {
+  background: var(--selected-bg);
+  color: var(--primary);
+  font-weight: 700;
+}
+
+/*-- 右側內容 --*/
+.page-content {
+  min-width: 0;
+  padding: 19px 32px 36px;
+  overflow-wrap: anywhere;
+}
+
+.page-title {
+  margin: 0 0 12px;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.page-description {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.8;
+}
+
+/*-- 頁尾資訊與 GitHub 連結 --*/
+.site-footer {
+  background: transparent;
+  border-top: none;
+}
+
+.footer-inner {
+  width: 100%;
+  max-width: none;
+  min-height: 31px;
+  margin-inline: 0;
+  padding: 4px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: right;
+  gap: 16px;
+}
+
+.footer-info {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+  color: var(--text-muted);
+}
+
+.github-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.github-link:hover {
+  opacity: 0.7;
+}
+
+/*-- 手機版：依頁首、主體、側欄、內容、頁尾排列 --*/
+@media (max-width: 640px) {
 }
