@@ -3,7 +3,8 @@ from typing import Literal
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-from analyzer import analyze_python, SYNTAX_TYPES, SYNTAX_DETAILS
+from analyzer import analyze_python
+from database import get_db_connection
 
 
 app = FastAPI()
@@ -66,14 +67,37 @@ def create_analysis(request: AnalysisRequest):
 # GET /api/syntaxes：取得語法辭典
 @app.get("/api/syntaxes")
 def get_syntaxes():
-    syntaxes = [
-        {
-            "slug": slug,
-            "name": name,
-            **SYNTAX_DETAILS[slug],
-        }
-        for slug, name in SYNTAX_TYPES.values()
-    ]
+    connection = get_db_connection()
+
+    try:
+        cursor = connection.cursor(dictionary=True)
+
+        try:
+            cursor.execute(
+                """
+                SELECT
+                    s.id,
+                    s.slug,
+                    s.name,
+                    COALESCE(s.summary, '') AS summary,
+                    COALESCE(s.example_code, '') AS example_code
+                FROM syntaxes AS s
+                JOIN syntax_categories AS c
+                    ON s.category_id = c.id
+                WHERE c.language = %s
+                  AND s.is_active = TRUE
+                ORDER BY s.sort_key, s.id
+                """,
+                ("python",),
+            )
+
+            syntaxes = cursor.fetchall()
+
+        finally:
+            cursor.close()
+
+    finally:
+        connection.close()
 
     return {
         "language": "python",

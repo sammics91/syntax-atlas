@@ -1,65 +1,107 @@
 import ast
+import io
+import tokenize
 from collections import Counter
 
+from database import get_db_connection
 
-SYNTAX_TYPES = {
-    ast.Assign: ("assignment", "一般賦值"),
-    ast.If: ("if", "條件判斷"),
-    ast.For: ("for", "for 迴圈"),
-    ast.While: ("while", "while 迴圈"),
-    ast.FunctionDef: ("function-definition", "函式定義"),
-    ast.Return: ("return", "return"),
-    ast.Call: ("function-call", "函式呼叫"),
-}
 
-SYNTAX_DETAILS = {
-    "assignment": {
-        "summary": "使用等號將右側的值指定給左側的變數或目標。",
-        "example_code": "score = 80\nname = \"Sammi\"",
-    },
-    "if": {
-        "summary": "依條件決定是否執行對應的程式區塊。",
-        "example_code": "if score >= 60:\n    print(\"及格\")",
-    },
-    "for": {
-        "summary": "依序取得可迭代物件中的項目，執行迴圈區塊。",
-        "example_code": "for number in [1, 2, 3]:\n    print(number)",
-    },
-    "while": {
-        "summary": "條件成立時持續執行迴圈區塊。",
-        "example_code": "count = 0\nwhile count < 3:\n    count += 1",
-    },
-    "function-definition": {
-        "summary": "使用 def 定義函式，封裝可重複呼叫的程式。",
-        "example_code": "def greet(name):\n    return \"Hello, \" + name",
-    },
-    "return": {
-        "summary": "結束目前的函式呼叫，並可將結果回傳給呼叫端。",
-        "example_code": "def add(a, b):\n    return a + b",
-    },
-    "function-call": {
-        "summary": "使用括號呼叫函式或其他可呼叫物件，並可傳入引數。",
-        "example_code": "print(\"Hello\")",
-    },
-}
+# 從資料庫讀取 Python 語法與辨識規則
+def get_detection_rules():
+    connection = get_db_connection()
 
+    try:
+        cursor = connection.cursor(dictionary=True)
+
+        try:
+            cursor.execute(
+                """
+                SELECT
+                    s.id AS syntax_id,
+                    s.slug,
+                    s.name,
+                    COALESCE(s.summary, '') AS summary,
+                    COALESCE(s.example_code, '') AS example_code,
+                    r.analyzer,
+                    r.rule_type,
+                    r.match_value
+                FROM syntax_detection_rules AS r
+                JOIN syntaxes AS s
+                    ON r.syntax_id = s.id
+                JOIN syntax_categories AS c
+                    ON s.category_id = c.id
+                WHERE c.language = %s
+                  AND s.is_active = TRUE
+                  AND r.is_active = TRUE
+                ORDER BY s.id, r.id
+                """,
+                ("python",),
+            )
+
+            return cursor.fetchall()
+
+        finally:
+            cursor.close()
+
+    finally:
+        connection.close()
+
+
+# 依資料庫規則分析 Python 程式碼
 def analyze_python(code: str):
+    # 語法錯誤會交給 main.py 處理
     tree = ast.parse(code)
-    counts = Counter()
 
-    for node in ast.walk(tree):
-        syntax = SYNTAX_TYPES.get(type(node))
+    # 統計 AST 節點
+    node_counts = Counter(
+        type(node).__name__
+        for node in ast.walk(tree)
+    )
 
-        if syntax is not None:
-            counts[syntax] += 1
+    # 統計關鍵字，排除字串與註解
+    tokens = tokenize.generate_tokens(io.StringIO(code).readline)
 
-    # 全部節點統計完成後，才回傳結果
+    keyword_counts = Counter(
+        token.string
+        for token in tokens
+        if token.type == tokenize.NAME
+    )
+
+    rules = get_detection_rules()
+    syntax_counts = Counter()
+    syntax_details = {}
+
+    for rule in rules:
+        if (
+            rule["analyzer"] == "python_ast"
+            and rule["rule_type"] == "node_type"
+        ):
+            count = node_counts[rule["match_value"]]
+
+        elif (
+            rule["analyzer"] == "python_tokenize"
+            and rule["rule_type"] == "keyword"
+        ):
+            count = keyword_counts[rule["match_value"]]
+
+        else:
+            # 本版尚未支援的規則先略過
+            continue
+
+        if count == 0:
+            continue
+
+        syntax_id = rule["syntax_id"]
+        syntax_counts[syntax_id] += count
+        syntax_details[syntax_id] = rule
+
     return [
         {
-            "slug": slug,
-            "name": name,
+            "slug": syntax_details[syntax_id]["slug"],
+            "name": syntax_details[syntax_id]["name"],
             "count": count,
-            **SYNTAX_DETAILS[slug],
+            "summary": syntax_details[syntax_id]["summary"],
+            "example_code": syntax_details[syntax_id]["example_code"],
         }
-        for (slug, name), count in counts.items()
+        for syntax_id, count in sorted(syntax_counts.items())
     ]
