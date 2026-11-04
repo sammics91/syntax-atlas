@@ -3,7 +3,7 @@ from typing import Literal
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-from analyzer import analyze_python
+from analyzer import analyze_python, SYNTAX_TYPES, SYNTAX_DETAILS
 
 
 app = FastAPI()
@@ -60,4 +60,22 @@ def create_analysis(request: AnalysisRequest):
         "valid": True,
         "syntaxes": syntaxes,
         "errors": [],
+    }
+
+
+# GET /api/syntaxes：取得語法辭典
+@app.get("/api/syntaxes")
+def get_syntaxes():
+    syntaxes = [
+        {
+            "slug": slug,
+            "name": name,
+            **SYNTAX_DETAILS[slug],
+        }
+        for slug, name in SYNTAX_TYPES.values()
+    ]
+
+    return {
+        "language": "python",
+        "syntaxes": syntaxes,
     }

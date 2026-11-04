@@ -13,6 +13,10 @@ const nextConfig: NextConfig = {
         source: "/api/analyses",
         destination: "http://127.0.0.1:8000/api/analyses",
       },
+      {
+        source: "/api/syntaxes",
+        destination: "http://127.0.0.1:8000/api/syntaxes",
+      },
     ];
   },
 

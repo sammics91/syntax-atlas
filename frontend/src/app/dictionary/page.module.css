@@ -1,0 +1,138 @@
+/*-- 載入、錯誤與空清單提示 --*/
+.message,
+.error {
+  margin: 24px 0 0;
+  line-height: 1.8;
+}
+
+.message {
+  color: var(--text-muted);
+}
+
+.error {
+  color: var(--error);
+}
+
+/*-- 語言標題 --*/
+.dictionary {
+  margin-top: 30px;
+}
+
+.languageTitle {
+  display: table;
+  margin: 0 0 8px;
+  padding: 0 12px 10px;
+  border-bottom: 2px solid var(--primary);
+  color: var(--primary);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/*-- 語法列表與滑過效果 --*/
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  position: relative;
+  border-bottom: 1px dotted var(--border);
+  background: var(--surface);
+  border-radius: 4px;
+  overflow: hidden;
+  transition:
+    transform 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.item:hover {
+  z-index: 1;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgb(0 0 0 / 10%);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 15px 22px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.row > span:last-child {
+  flex-shrink: 0;
+}
+
+.row:focus-visible {
+  outline: 2px solid var(--chart-gray);
+  outline-offset: -3px;
+}
+
+/*-- 展開後的標題列與說明 --*/
+.expanded .row {
+  background: var(--primary);
+  color: var(--surface);
+  font-weight: 700;
+}
+
+.details {
+  padding: 20px;
+  background: var(--soft-bg);
+}
+
+.explanation {
+  padding-left: 20px;
+  border-left: 3px solid var(--accent);
+}
+
+.explanation h3 {
+  margin: 0 0 10px;
+  font-weight: 700;
+}
+
+.explanation p {
+  margin: 0;
+  line-height: 1.8;
+}
+
+.explanation pre {
+  margin: 20px 0 0;
+  overflow-x: auto;
+  font-family: Consolas, "Courier New", monospace;
+  line-height: 1.7;
+}
+
+/*-- 手機版 --*/
+@media (max-width: 640px) {
+  .row {
+    padding: 14px;
+  }
+
+  .details {
+    padding: 16px 12px;
+  }
+
+  .explanation {
+    padding-left: 12px;
+  }
+}
+
+/*-- 減少動態效果的使用者設定 --*/
+@media (prefers-reduced-motion: reduce) {
+  .item {
+    transition: none;
+  }
+
+  .item:hover {
+    transform: none;
+  }
+}
