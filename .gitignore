@@ -1,0 +1,9 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# 本機環境設定
+.env
+.env.*
+!.env.example
