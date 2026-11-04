@@ -1,9 +1,16 @@
 "use client";
 
-import { useLayoutEffect, type ReactNode } from "react";
+// React
+import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
+
+// Next.js
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import Image from "next/image";
+
+// 自訂元件與型別
+import AuthDialog from "./AuthDialog";
+import type { AuthUser } from "./AuthDialog";
 
 const navigation = [
   { href: "/", label: "分析程式碼", prefix: "＋" },
@@ -14,6 +21,15 @@ const navigation = [
 
 export default function SiteShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+
+  // 目前會員與登入狀態
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [authError, setAuthError] = useState("");
+
+  // 登入視窗與登出操作
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   useLayoutEffect(() => {
     function updateScrollbarWidth() {
@@ -53,6 +69,75 @@ export default function SiteShell({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // 重新整理網頁時，透過 Cookie 確認登入狀態
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadCurrentUser() {
+      try {
+        const response = await fetch("/api/auth", {
+          credentials: "include",
+          cache: "no-store",
+          signal: controller.signal,
+        });
+
+        if (response.status === 401) {
+          if (!controller.signal.aborted) {
+            setUser(null);
+          }
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error("查詢登入狀態失敗");
+        }
+
+        const currentUser: AuthUser = await response.json();
+
+        if (!controller.signal.aborted) {
+          setUser(currentUser);
+        }
+      } catch {
+        if (!controller.signal.aborted) {
+          setAuthError("無法確認登入狀態，請重新整理再試。");
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsAuthLoading(false);
+        }
+      }
+    }
+
+    loadCurrentUser();
+
+    return () => controller.abort();
+  }, []);
+
+  // 登出
+  async function handleSignout() {
+    if (isSigningOut) return;
+
+    setIsSigningOut(true);
+    setAuthError("");
+
+    try {
+      const response = await fetch("/api/signout", {
+        method: "POST",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("登出失敗");
+      }
+
+      setUser(null);
+    } catch {
+      setAuthError("登出失敗，請稍後再試。");
+    } finally {
+      setIsSigningOut(false);
+    }
+  }
+
   return (
     <div className="site-shell">
       <header className="site-header">
@@ -67,19 +152,57 @@ export default function SiteShell({ children }: { children: ReactNode }) {
           </div>
 
           <div className="site-account">
-            <span className="account-name">訪客</span>
-
-            <button
-              type="button"
-              className="login-button"
-              disabled
-              title="會員功能開發中"
+            <span
+              className={`account-name${authError ? " account-name-error" : ""}`}
+              title={authError || undefined}
             >
-              <span className="account-label-desktop">登入／註冊</span>
-              <span className="account-label-mobile">登入</span>
-            </button>
+              {isAuthLoading
+                ? "確認中…"
+                : user
+                  ? user.name
+                  : authError
+                    ? "狀態未確認"
+                    : "訪客"}
+            </span>
+
+            {user ? (
+              <button
+                type="button"
+                className="login-button"
+                onClick={handleSignout}
+                disabled={isSigningOut}
+              >
+                <span className="account-label-desktop">
+                  {isSigningOut ? "登出中…" : "登出"}
+                </span>
+
+                <span className="account-label-mobile">
+                  {isSigningOut ? "登出中…" : `${user.name} · 登出`}
+                </span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="login-button"
+                disabled={isAuthLoading || Boolean(authError)}
+                onClick={() => setIsAuthOpen(true)}
+              >
+                <span className="account-label-desktop">登入／註冊</span>
+                <span className="account-label-mobile">登入</span>
+              </button>
+            )}
           </div>
         </div>
+
+        {isAuthOpen && (
+          <AuthDialog
+            onClose={() => setIsAuthOpen(false)}
+            onSignedIn={(currentUser) => {
+              setUser(currentUser);
+              setAuthError("");
+            }}
+          />
+        )}
       </header>
 
       <div className="site-body">

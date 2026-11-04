@@ -4,11 +4,15 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from analyzer import analyze_python
+from auth import router as auth_router
 from database import get_db_connection
+
 
 
 app = FastAPI()
 
+# 掛載會員 API
+app.include_router(auth_router)
 
 # 分析請求的資料格式，目前先支援 Python
 class AnalysisRequest(BaseModel):

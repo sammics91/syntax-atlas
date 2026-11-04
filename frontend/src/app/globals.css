@@ -58,6 +58,12 @@ button:focus-visible {
   outline-offset: 4px;
 }
 
+input::placeholder,
+textarea::placeholder {
+  color: color-mix(in oklab, currentColor 60%, transparent);
+  opacity: 1;
+}
+
 /*-- 整體框架 --*/
 .site-shell {
   min-height: 100dvh;
@@ -120,6 +126,11 @@ button:focus-visible {
 
 .account-name {
   font-size: 14px;
+  color: var(--text);
+}
+
+.account-name-error {
+  color: var(--error);
 }
 
 .login-button {
@@ -138,6 +149,14 @@ button:focus-visible {
 
 .account-label-mobile {
   display: none;
+}
+
+.account-error {
+  margin: 0;
+  padding: 8px 25px;
+  color: var(--error);
+  font-size: 14px;
+  line-height: 1.6;
 }
 
 /*-- 主體：置中容器與捲軸寬度補償 --*/

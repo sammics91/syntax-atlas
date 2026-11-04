@@ -6,16 +6,12 @@ const nextConfig: NextConfig = {
   // React
   reactCompiler: true,
 
-  // API 轉送請求
+  // 將所有 API 請求轉送到本機 FastAPI
   async rewrites() {
     return [
       {
-        source: "/api/analyses",
-        destination: "http://127.0.0.1:8000/api/analyses",
-      },
-      {
-        source: "/api/syntaxes",
-        destination: "http://127.0.0.1:8000/api/syntaxes",
+        source: "/api/:path*",
+        destination: "http://127.0.0.1:8000/api/:path*",
       },
     ];
   },
