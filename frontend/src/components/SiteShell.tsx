@@ -1,7 +1,7 @@
 "use client";
 
 // React
-import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
+import { useLayoutEffect, useState, type ReactNode } from "react";
 
 // Next.js
 import Image from "next/image";
@@ -10,7 +10,7 @@ import { usePathname } from "next/navigation";
 
 // 自訂元件與型別
 import AuthDialog from "./AuthDialog";
-import type { AuthUser } from "./AuthDialog";
+import { useAuth } from "./AuthProvider";
 
 const navigation = [
   { href: "/", label: "分析程式碼", prefix: "＋" },
@@ -22,14 +22,18 @@ const navigation = [
 export default function SiteShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
-  // 目前會員與登入狀態
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [isAuthLoading, setIsAuthLoading] = useState(true);
-  const [authError, setAuthError] = useState("");
+  // 從 AuthProvider 取得共用會員狀態
+  const {
+    user,
+    isAuthLoading,
+    isSigningOut,
+    authError,
+    completeSignin,
+    signout,
+  } = useAuth();
 
-  // 登入視窗與登出操作
+  // 登入視窗控制
   const [isAuthOpen, setIsAuthOpen] = useState(false);
-  const [isSigningOut, setIsSigningOut] = useState(false);
 
   useLayoutEffect(() => {
     function updateScrollbarWidth() {
@@ -69,75 +73,6 @@ export default function SiteShell({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // 重新整理網頁時，透過 Cookie 確認登入狀態
-  useEffect(() => {
-    const controller = new AbortController();
-
-    async function loadCurrentUser() {
-      try {
-        const response = await fetch("/api/auth", {
-          credentials: "include",
-          cache: "no-store",
-          signal: controller.signal,
-        });
-
-        if (response.status === 401) {
-          if (!controller.signal.aborted) {
-            setUser(null);
-          }
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error("查詢登入狀態失敗");
-        }
-
-        const currentUser: AuthUser = await response.json();
-
-        if (!controller.signal.aborted) {
-          setUser(currentUser);
-        }
-      } catch {
-        if (!controller.signal.aborted) {
-          setAuthError("無法確認登入狀態，請重新整理再試。");
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setIsAuthLoading(false);
-        }
-      }
-    }
-
-    loadCurrentUser();
-
-    return () => controller.abort();
-  }, []);
-
-  // 登出
-  async function handleSignout() {
-    if (isSigningOut) return;
-
-    setIsSigningOut(true);
-    setAuthError("");
-
-    try {
-      const response = await fetch("/api/signout", {
-        method: "POST",
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        throw new Error("登出失敗");
-      }
-
-      setUser(null);
-    } catch {
-      setAuthError("登出失敗，請稍後再試。");
-    } finally {
-      setIsSigningOut(false);
-    }
-  }
-
   return (
     <div className="site-shell">
       <header className="site-header">
@@ -169,7 +104,7 @@ export default function SiteShell({ children }: { children: ReactNode }) {
               <button
                 type="button"
                 className="login-button"
-                onClick={handleSignout}
+                onClick={signout}
                 disabled={isSigningOut}
               >
                 <span className="account-label-desktop">
@@ -197,10 +132,7 @@ export default function SiteShell({ children }: { children: ReactNode }) {
         {isAuthOpen && (
           <AuthDialog
             onClose={() => setIsAuthOpen(false)}
-            onSignedIn={(currentUser) => {
-              setUser(currentUser);
-              setAuthError("");
-            }}
+            onSignedIn={completeSignin}
           />
         )}
       </header>

@@ -1,6 +1,11 @@
-import type { Metadata } from "next";
+// React
 import type { ReactNode } from "react";
+// Next.js
+import type { Metadata } from "next";
+// 自訂元件
+import AuthProvider from "@/components/AuthProvider";
 import SiteShell from "@/components/SiteShell";
+//樣式
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -12,7 +17,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="zh-Hant">
       <body>
-        <SiteShell>{children}</SiteShell>
+        <AuthProvider>
+          <SiteShell>{children}</SiteShell>
+        </AuthProvider>
       </body>
     </html>
   );
