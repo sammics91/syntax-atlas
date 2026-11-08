@@ -1,0 +1,348 @@
+/* 載入狀態與錯誤訊息 */
+.message,
+.error {
+  margin: 32px 9px 0;
+  line-height: 1.6;
+}
+
+.message {
+  color: var(--text-muted);
+}
+
+.error {
+  color: var(--error);
+}
+
+/* 尚未儲存紀錄時的卡片 */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 298px;
+  margin-top: 32px;
+  padding: 28px 24px;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+/* 金色符號 */
+.icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 48px;
+  margin-bottom: 6px;
+  color: var(--accent);
+  font-family: Georgia, serif;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+/* 卡片標題與說明 */
+.empty h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.empty p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* 回首頁按鈕 */
+.startButton {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 11px 22px;
+  color: var(--surface);
+  background: var(--primary);
+  border-radius: 4px;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.startButton:hover {
+  background: var(--accent);
+}
+
+.startButton:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+
+/* 程式碼紀錄清單 */
+.recordList {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-top: 32px;
+}
+
+/* 每筆紀錄的卡片 */
+.recordCard {
+  min-width: 0;
+  padding: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+/* 卡片標題與刪除按鈕 */
+.recordHeader {
+  position: relative;
+  min-height: 33px;
+  padding-right: 92px;
+}
+
+.deleteButton {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 10px 20px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.deleteButton:hover {
+  background: var(--soft-bg);
+}
+
+.deleteButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* 紀錄編號與名稱 */
+.recordTitle {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* 語言、日期與語法種類數 */
+.recordMeta {
+  margin: 12px 0 20px;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* 刪除確認視窗 */
+.deleteDialog {
+  width: min(490px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  margin: auto;
+  padding: 25px 31px;
+  overflow-y: auto;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--accent);
+  border-radius: 6px;
+  position: relative;
+}
+
+.deleteDialog::backdrop {
+  background: rgb(0 0 0 / 30%);
+}
+
+/* 右上角關閉按鈕 */
+.closeButton {
+  position: absolute;
+  top: 8px;
+  right: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.closeButton:hover:not(:disabled) {
+  background: var(--soft-bg);
+  color: var(--primary);
+}
+
+.closeButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.deleteDialog h2 {
+  margin: 0 0 20px;
+  padding-right: 26px;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.deleteDialog p {
+  overflow-wrap: anywhere;
+}
+
+/* 紀錄名稱與刪除提醒之間的距離 */
+.deleteDialog > p + p {
+  margin-top: 9px;
+}
+
+/* 刪除方式 */
+.deleteOptions {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin: 25px 0;
+  padding: 0;
+  border: 0;
+}
+
+.deleteOptions legend {
+  margin-bottom: 9px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.deleteOption {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 11px 19px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.deleteOption:has(input:checked) {
+  background: var(--soft-bg);
+}
+
+.deleteOption input {
+  flex-shrink: 0;
+  margin-top: 5px;
+  accent-color: var(--primary);
+}
+
+.deleteOption strong,
+.deleteOption small {
+  display: block;
+}
+
+.deleteOption strong {
+  font-weight: 700;
+}
+
+.deleteOption small {
+  margin-top: 4px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.deleteError {
+  color: var(--error);
+}
+
+/* 取消與確認刪除 */
+.deleteActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 11px;
+}
+
+.deleteActions button {
+  padding: 9px 22px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.deleteActions .confirmDelete {
+  color: var(--surface);
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+/* 取消：滑鼠移入時，與關閉鈕相同 */
+.deleteActions button:not(.confirmDelete):hover:not(:disabled) {
+  background: var(--soft-bg);
+  color: var(--primary);
+}
+
+/* 確認刪除：與登入按鈕相同 */
+.deleteActions .confirmDelete:hover:not(:disabled) {
+  filter: brightness(0.9);
+}
+
+.deleteActions button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* 程式碼預覽 */
+.codePreview {
+  max-height: 220px;
+  margin: 0;
+  padding: 24px;
+  overflow: auto;
+  background: var(--page-bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text);
+  font-family: Consolas, monospace;
+  font-size: 15px;
+  line-height: 1.6;
+  white-space: pre;
+}
+
+.codePreview code {
+  font: inherit;
+}
+
+/* 手機版 */
+@media (max-width: 640px) {
+  .empty {
+    margin-top: 24px;
+    padding: 28px 16px;
+  }
+
+  .recordList {
+    margin-top: 24px;
+    gap: 16px;
+  }
+
+  .recordCard {
+    padding: 20px 16px;
+  }
+
+  .recordTitle {
+    font-size: 20px;
+  }
+
+  .deleteDialog {
+    padding: 24px 20px;
+  }
+
+  .codePreview {
+    padding: 16px;
+    font-size: 13px;
+  }
+}

@@ -1,12 +1,18 @@
 "use client";
 
 // React
-import { useLayoutEffect, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 // Next.js
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 // 自訂元件與型別
 import AuthDialog from "./AuthDialog";
@@ -21,6 +27,7 @@ const navigation = [
 
 export default function SiteShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
 
   // 從 AuthProvider 取得共用會員狀態
   const {
@@ -34,6 +41,13 @@ export default function SiteShell({ children }: { children: ReactNode }) {
 
   // 登入視窗控制
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+
+  // 避免同一次進入重複跳出警告
+  const warnedPath = useRef<string | null>(null);
+
+  // 判斷目前頁面是否需要登入
+  const requiresLogin =
+    pathname === "/records" || pathname.startsWith("/records/");
 
   useLayoutEffect(() => {
     function updateScrollbarWidth() {
@@ -72,6 +86,26 @@ export default function SiteShell({ children }: { children: ReactNode }) {
       document.documentElement.style.removeProperty("--scrollbar-width");
     };
   }, []);
+
+  // 訪客進入紀錄頁時，提示登入並返回首頁
+  useEffect(() => {
+    if (!requiresLogin || user) {
+      warnedPath.current = null;
+      return;
+    }
+
+    // 等身分確認完成；連線失敗時不要誤判成訪客
+    if (isAuthLoading || authError) return;
+
+    if (warnedPath.current === pathname) return;
+    warnedPath.current = pathname;
+
+    window.alert("請先登入，才能查看常用語法與程式碼紀錄。");
+
+    // alert 會等使用者按確定後，才繼續執行
+    router.replace("/");
+    setIsAuthOpen(true);
+  }, [requiresLogin, user, isAuthLoading, authError, pathname, router]);
 
   return (
     <div className="site-shell">
@@ -160,7 +194,17 @@ export default function SiteShell({ children }: { children: ReactNode }) {
           </nav>
         </aside>
 
-        <main className="page-content">{children}</main>
+        <main className="page-content">
+          {requiresLogin && isAuthLoading ? (
+            <p role="status">正在確認登入狀態…</p>
+          ) : requiresLogin && !user ? (
+            authError ? (
+              <p role="alert">{authError}</p>
+            ) : null
+          ) : (
+            children
+          )}
+        </main>
       </div>
 
       <footer className="site-footer">
