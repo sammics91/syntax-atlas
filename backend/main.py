@@ -6,13 +6,15 @@ from pydantic import BaseModel, Field
 from analyzer import analyze_python
 from auth import router as auth_router
 from database import get_db_connection
+from records import router as records_router
 
 
 
 app = FastAPI()
 
-# 掛載會員 API
+# 掛載 API
 app.include_router(auth_router)
+app.include_router(records_router)
 
 # 分析請求的資料格式，目前先支援 Python
 class AnalysisRequest(BaseModel):

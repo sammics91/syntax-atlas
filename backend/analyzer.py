@@ -97,6 +97,7 @@ def analyze_python(code: str):
 
     return [
         {
+            "syntax_id": syntax_id,
             "slug": syntax_details[syntax_id]["slug"],
             "name": syntax_details[syntax_id]["name"],
             "count": count,
