@@ -1,6 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+
+import AuthDialog from "@/components/AuthDialog";
+import { useAuth } from "@/components/AuthProvider";
+
 import styles from "./page.module.css";
 
 // 分析結果的型別
@@ -32,6 +36,16 @@ export default function HomePage() {
   const [error, setError] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [expandedSlug, setExpandedSlug] = useState<string | null>(null);
+
+  const { user, isAuthLoading, authError, completeSignin } = useAuth();
+
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedRecordNumber, setSavedRecordNumber] = useState<number | null>(
+    null,
+  );
+  const [isSaveAuthOpen, setIsSaveAuthOpen] = useState(false);
+
+  const savingRef = useRef(false);
 
   async function handleAnalyze() {
     if (isAnalyzing) return;
@@ -119,6 +133,83 @@ export default function HomePage() {
     }
   }
 
+  // 將目前的程式碼儲存為會員紀錄
+  async function handleSave() {
+    if (savingRef.current || !result?.valid || savedRecordNumber !== null) {
+      return;
+    }
+
+    savingRef.current = true;
+    setIsSaving(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/records", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: title.trim() || null,
+          language: result.language,
+          code,
+        }),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          setError("登入已失效，請重新登入後再儲存。");
+          setIsSaveAuthOpen(true);
+          return;
+        }
+
+        const message =
+          typeof data?.detail === "string"
+            ? data.detail
+            : typeof data?.detail?.message === "string"
+              ? data.detail.message
+              : "無法儲存程式碼紀錄，請稍後再試。";
+
+        setError(message);
+        return;
+      }
+
+      setSavedRecordNumber(data.record_number);
+    } catch {
+      setError("無法連線至儲存服務，請稍後再試。");
+    } finally {
+      savingRef.current = false;
+      setIsSaving(false);
+    }
+  }
+
+  // 尚未分析時先分析，分析成功後才儲存
+  function handlePrimaryAction() {
+    if (isAnalyzing || isSaving || savingRef.current) return;
+
+    if (!result) {
+      void handleAnalyze();
+      return;
+    }
+
+    if (isAuthLoading) return;
+
+    if (authError) {
+      setError("無法確認登入狀態，請重新整理後再儲存。");
+      return;
+    }
+
+    if (!user) {
+      setIsSaveAuthOpen(true);
+      return;
+    }
+
+    void handleSave();
+  }
+
   return (
     <>
       <h1 className="page-title">這次，你用了哪些語法？</h1>
@@ -136,7 +227,12 @@ export default function HomePage() {
             placeholder="ex: 購物清單練習 (選填)"
             maxLength={30}
             value={title}
-            onChange={(event) => setTitle(event.target.value)}
+            disabled={isAnalyzing || isSaving}
+            onChange={(event) => {
+              setTitle(event.target.value);
+              setSavedRecordNumber(null);
+              setError("");
+            }}
           />
         </div>
 
@@ -149,13 +245,14 @@ export default function HomePage() {
             spellCheck={false}
             autoCapitalize="off"
             autoCorrect="off"
-            disabled={isAnalyzing}
+            disabled={isAnalyzing || isSaving}
             value={code}
             onChange={(event) => {
               setCode(event.target.value);
               setResult(null);
               setExpandedSlug(null);
               setError("");
+              setSavedRecordNumber(null);
             }}
           />
         </div>
@@ -167,15 +264,46 @@ export default function HomePage() {
         )}
 
         <div className={styles.actions}>
-          <p className={styles.characterCount}>目前輸入 {code.length} 個字元</p>
+          <div className={styles.actionInfo}>
+            <p className={styles.characterCount}>
+              目前輸入 {code.length} 個字元
+            </p>
+
+            {savedRecordNumber !== null ? (
+              <p className={styles.saveMessage} role="status">
+                程式碼已儲存，紀錄編號 #{savedRecordNumber}。
+              </p>
+            ) : !isAuthLoading && !user ? (
+              <p className={styles.saveHint}>
+                登入後可儲存紀錄，再次開啟與編輯。
+              </p>
+            ) : null}
+          </div>
 
           <button
             type="button"
             className={styles.analyzeButton}
-            onClick={handleAnalyze}
-            disabled={isAnalyzing}
+            onClick={handlePrimaryAction}
+            disabled={
+              isAnalyzing ||
+              isSaving ||
+              savedRecordNumber !== null ||
+              (Boolean(result) && isAuthLoading)
+            }
           >
-            {isAnalyzing ? "分析中…" : "分析程式碼 →"}
+            {isAnalyzing
+              ? "分析中…"
+              : isSaving
+                ? "儲存中…"
+                : savedRecordNumber !== null
+                  ? "已儲存"
+                  : !result
+                    ? "分析程式碼 →"
+                    : isAuthLoading
+                      ? "確認登入狀態中…"
+                      : user
+                        ? "儲存紀錄"
+                        : "登入並儲存"}
           </button>
         </div>
       </section>
@@ -250,6 +378,16 @@ export default function HomePage() {
             次數依程式碼中的出現次數計算，並非實際執行次數。
           </p>
         </section>
+      )}
+
+      {isSaveAuthOpen && (
+        <AuthDialog
+          onClose={() => setIsSaveAuthOpen(false)}
+          onSignedIn={(currentUser) => {
+            completeSignin(currentUser);
+            setIsSaveAuthOpen(false);
+          }}
+        />
       )}
     </>
   );

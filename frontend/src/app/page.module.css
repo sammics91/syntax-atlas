@@ -82,6 +82,26 @@
   font-size: 13px;
 }
 
+/* 字元數與儲存提示 */
+.actionInfo {
+  min-width: 0;
+}
+
+.saveHint,
+.saveMessage {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.saveHint {
+  color: var(--text-muted);
+}
+
+.saveMessage {
+  color: var(--primary);
+}
+
 .analyzeButton {
   flex-shrink: 0;
   padding: 10px 20px;
