@@ -12,6 +12,7 @@ import styles from "./page.module.css";
 type SyntaxResult = {
   slug: string;
   name: string;
+  display_label: string | null;
   count: number;
   summary: string;
   example_code: string;
@@ -63,6 +64,7 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
   const [isSaveAuthOpen, setIsSaveAuthOpen] = useState(false);
 
   const savingRef = useRef(false);
+  const resultScrollRef = useRef<HTMLDivElement>(null);
 
   // 目前開啟的原紀錄
   const [editingRecord, setEditingRecord] = useState<{
@@ -157,6 +159,24 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
     return () => controller.abort();
   }, [recordId, user?.id, isAuthLoading]);
 
+  // 分析成功、結果顯示後，將儲存按鈕與結果移到可見的位置
+  useEffect(() => {
+    if (!result) return;
+
+    const frameId = requestAnimationFrame(() => {
+      const reduceMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+
+      resultScrollRef.current?.scrollIntoView({
+        behavior: reduceMotion ? "instant" : "smooth",
+        block: "start",
+      });
+    });
+
+    return () => cancelAnimationFrame(frameId);
+  }, [result]);
+
   async function handleAnalyze() {
     if (isAnalyzing) return;
 
@@ -235,7 +255,10 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
       }
 
       // 保存成功的分析結果
-      setResult(analysis);
+      setResult({
+        ...analysis,
+        syntaxes: [...analysis.syntaxes].sort((a, b) => b.count - a.count),
+      });
     } catch {
       setError("無法連線至分析服務，請確認後端已啟動。");
     } finally {
@@ -429,7 +452,7 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
           </p>
         )}
 
-        <div className={styles.actions}>
+        <div ref={resultScrollRef} className={styles.actions}>
           <div className={styles.actionInfo}>
             <p className={styles.characterCount}>
               目前輸入 {code.length} 個字元
@@ -470,7 +493,7 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
                       : user
                         ? editingRecord
                           ? "儲存變更"
-                          : "儲存紀錄"
+                          : "儲存程式碼"
                         : "登入並儲存"}
           </button>
         </div>
@@ -511,7 +534,13 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
                         );
                       }}
                     >
-                      <span className={styles.syntaxName}>{syntax.name}</span>
+                      <span className={styles.syntaxName}>
+                        {syntax.name}
+                        {syntax.display_label &&
+                          syntax.display_label !== syntax.name && (
+                            <span>{"　· "}{syntax.display_label}</span>
+                          )}
+                      </span>
 
                       <span className={styles.syntaxCount}>
                         {syntax.count} 次
