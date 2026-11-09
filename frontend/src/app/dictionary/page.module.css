@@ -72,6 +72,40 @@
   flex-shrink: 0;
 }
 
+.name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* 中文名稱預留空間，顯示時不推動右側使用狀態 */
+.displayLabel {
+  opacity: 0;
+}
+
+.row:hover .displayLabel,
+.row:focus-visible .displayLabel,
+.expanded .displayLabel {
+  opacity: 1;
+}
+
+.usedName {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.usage {
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+/* 未展開時，滑過整列才加深已使用次數的文字 */
+.item:not(.expanded):hover .usedUsage {
+  color: var(--text);
+}
+
 .row:focus-visible {
   outline: 2px solid var(--chart-gray);
   outline-offset: -3px;
@@ -82,6 +116,11 @@
   background: var(--primary);
   color: var(--surface);
   font-weight: 700;
+}
+
+.expanded .usedName,
+.expanded .usedUsage {
+  color: var(--surface);
 }
 
 .details {

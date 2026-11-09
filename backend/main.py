@@ -87,6 +87,7 @@ def get_syntaxes():
                     s.id,
                     s.slug,
                     s.name,
+                    s.display_label,
                     COALESCE(s.summary, '') AS summary,
                     COALESCE(s.example_code, '') AS example_code
                 FROM syntaxes AS s
