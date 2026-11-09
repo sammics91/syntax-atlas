@@ -7,6 +7,7 @@ from analyzer import analyze_python
 from auth import router as auth_router
 from bookmarks import router as bookmarks_router
 from database import get_db_connection
+from password_reset import router as password_reset_router
 from records import router as records_router
 from syntax_statistics import router as statistics_router
 
@@ -17,6 +18,7 @@ app = FastAPI()
 # 掛載 API
 app.include_router(auth_router)
 app.include_router(bookmarks_router)
+app.include_router(password_reset_router)
 app.include_router(records_router)
 app.include_router(statistics_router)
 

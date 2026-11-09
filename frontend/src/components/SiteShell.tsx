@@ -16,6 +16,7 @@ import { usePathname, useRouter } from "next/navigation";
 
 // 自訂元件與型別
 import AuthDialog from "./AuthDialog";
+import ResetPasswordDialog from "./ResetPasswordDialog";
 import { useAuth } from "./AuthProvider";
 
 const navigation = [
@@ -41,6 +42,12 @@ export default function SiteShell({ children }: { children: ReactNode }) {
 
   // 登入視窗控制
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+
+  // 登入視窗額外顯示的提示
+  const [authNotice, setAuthNotice] = useState("");
+
+  // 郵件中的重設憑證
+  const [resetToken, setResetToken] = useState<string | null>(null);
 
   // 避免同一次進入重複跳出警告
   const warnedPath = useRef<string | null>(null);
@@ -109,6 +116,71 @@ export default function SiteShell({ children }: { children: ReactNode }) {
     setIsAuthOpen(true);
   }, [requiresLogin, user, isAuthLoading, authError, pathname, router]);
 
+  // 從郵件開啟首頁時，讀取憑證並顯示重設視窗
+  useEffect(() => {
+    function readResetToken() {
+      if (window.location.pathname !== "/") {
+        setResetToken(null);
+        return;
+      }
+
+      const fragment = new URLSearchParams(window.location.hash.slice(1));
+
+      if (!fragment.has("reset_token")) {
+        setResetToken(null);
+        return;
+      }
+
+      setIsAuthOpen(false);
+      setAuthNotice("");
+      setResetToken(fragment.get("reset_token") ?? "");
+    }
+
+    readResetToken();
+    window.addEventListener("hashchange", readResetToken);
+
+    return () => {
+      window.removeEventListener("hashchange", readResetToken);
+    };
+  }, [pathname]);
+
+  // 重設成功返回首頁後，提示使用新密碼登入
+  useEffect(() => {
+    const url = new URL(window.location.href);
+
+    if (url.searchParams.get("password-reset") !== "success") {
+      return;
+    }
+
+    setAuthNotice("密碼已重設，請使用新密碼重新登入。");
+    setIsAuthOpen(true);
+
+    url.searchParams.delete("password-reset");
+
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${url.pathname}${url.search}${url.hash}`,
+    );
+  }, []);
+
+  // 關閉視窗時，一併移除網址上的重設憑證
+  function handleCloseResetPassword() {
+    const url = new URL(window.location.href);
+    const fragment = new URLSearchParams(url.hash.slice(1));
+
+    fragment.delete("reset_token");
+    url.hash = fragment.toString();
+
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${url.pathname}${url.search}${url.hash}`,
+    );
+
+    setResetToken(null);
+  }
+
   return (
     <div className="site-shell">
       <header className="site-header">
@@ -165,9 +237,13 @@ export default function SiteShell({ children }: { children: ReactNode }) {
           </div>
         </div>
 
-        {isAuthOpen && (
+        {isAuthOpen && resetToken === null && (
           <AuthDialog
-            onClose={() => setIsAuthOpen(false)}
+            notice={authNotice}
+            onClose={() => {
+              setIsAuthOpen(false);
+              setAuthNotice("");
+            }}
             onSignedIn={completeSignin}
           />
         )}
@@ -226,6 +302,14 @@ export default function SiteShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       </footer>
+
+      {resetToken !== null && (
+        <ResetPasswordDialog
+          key={resetToken}
+          token={resetToken}
+          onClose={handleCloseResetPassword}
+        />
+      )}
     </div>
   );
 }
