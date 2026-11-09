@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import AuthDialog from "@/components/AuthDialog";
 import { useAuth } from "@/components/AuthProvider";
@@ -30,6 +31,22 @@ type AnalysisResult = {
 };
 
 export default function HomePage() {
+  return (
+    <Suspense fallback={<p role="status">正在載入頁面…</p>}>
+      <HomePageRoute />
+    </Suspense>
+  );
+}
+
+function HomePageRoute() {
+  // 取得網址的 record
+  const searchParams = useSearchParams();
+  const recordId = searchParams.get("record");
+
+  return <HomeEditor key={recordId ?? "new"} recordId={recordId} />;
+}
+
+function HomeEditor({ recordId }: { recordId: string | null }) {
   const [title, setTitle] = useState("");
   const [code, setCode] = useState("");
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -46,6 +63,99 @@ export default function HomePage() {
   const [isSaveAuthOpen, setIsSaveAuthOpen] = useState(false);
 
   const savingRef = useRef(false);
+
+  // 目前開啟的原紀錄
+  const [editingRecord, setEditingRecord] = useState<{
+    id: number;
+    record_number: number;
+    user_id: number;
+  } | null>(null);
+
+  const [recordError, setRecordError] = useState("");
+
+  // 有指定紀錄時，必須先成功讀取才能操作
+  const isEditorReady =
+    recordId === null ||
+    (user !== null &&
+      editingRecord !== null &&
+      editingRecord.user_id === user.id &&
+      String(editingRecord.id) === recordId);
+
+  // 開啟編輯網址時，讀取原本儲存的名稱與程式碼
+  useEffect(() => {
+    if (recordId === null) return;
+
+    setEditingRecord(null);
+    setRecordError("");
+    setTitle("");
+    setCode("");
+    setResult(null);
+    setExpandedSlug(null);
+    setSavedRecordNumber(null);
+    setError("");
+
+    if (!/^[1-9]\d*$/.test(recordId)) {
+      setRecordError("紀錄編號不正確。");
+      return;
+    }
+
+    if (isAuthLoading || !user) return;
+
+    const controller = new AbortController();
+    const currentUserId = user.id;
+
+    async function loadRecord() {
+      try {
+        const response = await fetch(`/api/records/${recordId}`, {
+          credentials: "include",
+          cache: "no-store",
+          signal: controller.signal,
+        });
+
+        const data = await response.json().catch(() => null);
+
+        if (!response.ok) {
+          throw new Error(
+            typeof data?.detail === "string"
+              ? data.detail
+              : "無法取得這筆程式碼紀錄，請稍後再試。",
+          );
+        }
+
+        if (
+          !data ||
+          String(data.id) !== recordId ||
+          typeof data.record_number !== "number" ||
+          typeof data.code !== "string" ||
+          data.language !== "python"
+        ) {
+          throw new Error("紀錄內容格式異常，無法開啟編輯。");
+        }
+
+        if (controller.signal.aborted) return;
+
+        setTitle(data.title ?? "");
+        setCode(data.code);
+        setEditingRecord({
+          id: data.id,
+          record_number: data.record_number,
+          user_id: currentUserId,
+        });
+      } catch (error) {
+        if (controller.signal.aborted) return;
+
+        setRecordError(
+          error instanceof Error
+            ? error.message
+            : "無法取得這筆程式碼紀錄，請稍後再試。",
+        );
+      }
+    }
+
+    void loadRecord();
+
+    return () => controller.abort();
+  }, [recordId, user?.id, isAuthLoading]);
 
   async function handleAnalyze() {
     if (isAnalyzing) return;
@@ -135,7 +245,12 @@ export default function HomePage() {
 
   // 將目前的程式碼儲存為會員紀錄
   async function handleSave() {
-    if (savingRef.current || !result?.valid || savedRecordNumber !== null) {
+    if (
+      !isEditorReady ||
+      savingRef.current ||
+      !result?.valid ||
+      savedRecordNumber !== null
+    ) {
       return;
     }
 
@@ -144,18 +259,21 @@ export default function HomePage() {
     setError("");
 
     try {
-      const response = await fetch("/api/records", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        editingRecord ? `/api/records/${editingRecord.id}` : "/api/records",
+        {
+          method: editingRecord ? "PUT" : "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            title: title.trim() || null,
+            language: result.language,
+            code,
+          }),
         },
-        body: JSON.stringify({
-          title: title.trim() || null,
-          language: result.language,
-          code,
-        }),
-      });
+      );
 
       const data = await response.json().catch(() => null);
 
@@ -210,9 +328,57 @@ export default function HomePage() {
     void handleSave();
   }
 
+  if (recordId !== null && !isEditorReady) {
+    return (
+      <>
+        <h1 className="page-title">編輯程式碼紀錄</h1>
+
+        {recordError ? (
+          <p className={styles.error} role="alert">
+            {recordError}
+          </p>
+        ) : isAuthLoading ? (
+          <p role="status">正在確認登入狀態…</p>
+        ) : authError ? (
+          <p className={styles.error} role="alert">
+            {authError}
+          </p>
+        ) : !user ? (
+          <>
+            <p>請先登入，才能開啟這筆程式碼紀錄。</p>
+
+            <button
+              type="button"
+              className={styles.analyzeButton}
+              onClick={() => setIsSaveAuthOpen(true)}
+            >
+              登入
+            </button>
+          </>
+        ) : (
+          <p role="status">正在載入程式碼紀錄…</p>
+        )}
+
+        {isSaveAuthOpen && (
+          <AuthDialog
+            onClose={() => setIsSaveAuthOpen(false)}
+            onSignedIn={(currentUser) => {
+              completeSignin(currentUser);
+              setIsSaveAuthOpen(false);
+            }}
+          />
+        )}
+      </>
+    );
+  }
+
   return (
     <>
-      <h1 className="page-title">這次，你用了哪些語法？</h1>
+      <h1 className="page-title">
+        {editingRecord
+          ? `編輯程式碼紀錄 #${editingRecord.record_number}`
+          : "這次，你用了哪些語法？"}
+      </h1>
 
       <p className="page-description">貼上程式碼，讓每一次練習都留下足跡。</p>
 
@@ -302,7 +468,9 @@ export default function HomePage() {
                     : isAuthLoading
                       ? "確認登入狀態中…"
                       : user
-                        ? "儲存紀錄"
+                        ? editingRecord
+                          ? "儲存變更"
+                          : "儲存紀錄"
                         : "登入並儲存"}
           </button>
         </div>

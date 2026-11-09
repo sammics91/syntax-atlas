@@ -253,9 +253,16 @@ export default function RecordsPage() {
                   程式碼已移除，已保留語法使用次數紀錄。
                 </p>
               ) : (
-                <pre className={styles.codePreview}>
-                  <code>{record.code}</code>
-                </pre>
+                <Link
+                  href={`/?record=${record.id}`}
+                  className={styles.recordEditLink}
+                  aria-label={`編輯紀錄 #${record.record_number}`}
+                  title="點擊編輯這份程式碼"
+                >
+                  <pre className={styles.codePreview}>
+                    <code>{record.code}</code>
+                  </pre>
+                </Link>
               )}
             </article>
           ))}

@@ -297,6 +297,21 @@
   opacity: 0.6;
 }
 
+/* 點擊程式碼，開啟原紀錄編輯 */
+.recordEditLink {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+/* 滑鼠移入或鍵盤選取時，與首頁輸入框相同 */
+.recordEditLink:hover,
+.recordEditLink:focus-visible {
+  outline: 2px solid var(--chart-gray);
+  outline-offset: 2px;
+  border-radius: 5px;
+}
+
 /* 程式碼預覽 */
 .codePreview {
   max-height: 220px;
