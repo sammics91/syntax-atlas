@@ -1,0 +1,200 @@
+/* 載入狀態與錯誤訊息 */
+.message,
+.error {
+  margin: 32px 9px 0;
+  line-height: 1.6;
+}
+
+.message {
+  color: var(--text-muted);
+}
+
+.error {
+  color: var(--error);
+}
+
+/* 尚未儲存紀錄時的卡片 */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 298px;
+  margin-top: 32px;
+  padding: 28px 24px;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 48px;
+  margin-bottom: 6px;
+  color: var(--accent);
+  font-family: Georgia, serif;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.empty h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.empty p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.startButton {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 11px 22px;
+  color: var(--surface);
+  background: var(--primary);
+  border-radius: 4px;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.startButton:hover {
+  background: var(--accent);
+}
+
+.startButton:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+
+/* 常用語法區塊 */
+.section {
+  margin-top: 32px;
+}
+
+/* 語言標題與語法種類數 */
+.heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.heading h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.heading > span {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+/* 排名卡片 */
+.card {
+  padding: 24px 28px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.noUsages {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+/* 語法排名清單 */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.rank {
+  flex-shrink: 0;
+  width: 32px;
+  color: var(--accent);
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 語法名稱與累積次數 */
+.label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  margin-bottom: 10px;
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+.name {
+  overflow-wrap: anywhere;
+}
+
+.count {
+  flex-shrink: 0;
+  font-size: 16px;
+}
+
+/* 使用次數長條 */
+.track {
+  height: 5px;
+  overflow: hidden;
+  background: var(--soft-bg);
+}
+
+.bar {
+  height: 100%;
+  background: var(--primary);
+}
+
+/* 手機版 */
+@media (max-width: 640px) {
+  .empty {
+    margin-top: 24px;
+    padding: 28px 16px;
+  }
+
+  .card {
+    padding: 20px 16px;
+  }
+
+  .item {
+    gap: 12px;
+  }
+
+  .label {
+    font-size: 16px;
+  }
+
+  .count {
+    font-size: 14px;
+  }
+}

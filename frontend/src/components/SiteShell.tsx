@@ -45,9 +45,11 @@ export default function SiteShell({ children }: { children: ReactNode }) {
   // 避免同一次進入重複跳出警告
   const warnedPath = useRef<string | null>(null);
 
-  // 判斷目前頁面是否需要登入
+  // 常用語法與程式碼紀錄需要登入
   const requiresLogin =
-    pathname === "/records" || pathname.startsWith("/records/");
+    pathname === "/statistics" ||
+    pathname === "/records" ||
+    pathname.startsWith("/records/");
 
   useLayoutEffect(() => {
     function updateScrollbarWidth() {
@@ -87,7 +89,7 @@ export default function SiteShell({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // 訪客進入紀錄頁時，提示登入並返回首頁
+  // 訪客進入需要登入的頁面時，提示登入並返回首頁
   useEffect(() => {
     if (!requiresLogin || user) {
       warnedPath.current = null;
