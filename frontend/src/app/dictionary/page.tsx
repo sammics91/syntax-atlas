@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
+import AuthDialog from "@/components/AuthDialog";
 import { useAuth } from "@/components/AuthProvider";
 
 import styles from "./page.module.css";
@@ -15,6 +16,12 @@ type SyntaxEntry = {
   summary: string;
   example_description: string;
   example_code: string;
+};
+
+type MemberBookmarks = {
+  ownerId: number;
+  ids: number[];
+  error: boolean;
 };
 
 // 搜尋時忽略大小寫、全半形與排版空白
@@ -34,7 +41,8 @@ function searchRank(syntax: SyntaxEntry, keyword: string) {
   if (names.some((name) => name.startsWith(query))) return 1;
   if (names.some((name) => name.includes(query))) return 2;
   if (normalizeSearch(syntax.summary ?? "").includes(query)) return 3;
-  if (normalizeSearch(syntax.example_description ?? "").includes(query)) return 4;
+  if (normalizeSearch(syntax.example_description ?? "").includes(query))
+    return 4;
   if (normalizeSearch(syntax.category_name ?? "").includes(query)) return 5;
 
   return Infinity;
@@ -58,8 +66,24 @@ function compareDictionaryEntries(a: SyntaxEntry, b: SyntaxEntry) {
   if (groupA === 2) {
     // 同族符號相鄰，例如 +、+=、+x，以及 *、**、**=。
     const families = [
-      "+", "-", "*", "/", "%", "@", "<", ">", "=", "!",
-      "&", "|", "^", "~", ":", "[", "(", "{",
+      "+",
+      "-",
+      "*",
+      "/",
+      "%",
+      "@",
+      "<",
+      ">",
+      "=",
+      "!",
+      "&",
+      "|",
+      "^",
+      "~",
+      ":",
+      "[",
+      "(",
+      "{",
     ];
     const familyIndex = (name: string) => {
       const index = families.indexOf(name[0]);
@@ -70,22 +94,100 @@ function compareDictionaryEntries(a: SyntaxEntry, b: SyntaxEntry) {
     if (nameA !== nameB) return nameA < nameB ? -1 : 1;
   }
 
-  return nameA.localeCompare(nameB, "en", { sensitivity: "base" }) || a.id - b.id;
+  return (
+    nameA.localeCompare(nameB, "en", { sensitivity: "base" }) || a.id - b.id
+  );
 }
 
 export default function DictionaryPage() {
-  const { user, isAuthLoading } = useAuth();
+  const { user, isAuthLoading, authError, completeSignin } = useAuth();
   const [syntaxes, setSyntaxes] = useState<SyntaxEntry[]>([]);
   const [expandedSlug, setExpandedSlug] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [hasSubmittedSearch, setHasSubmittedSearch] = useState(false);
+  // 收藏篩選與會員身分綁定
+  const [bookmarkFilterOwnerId, setBookmarkFilterOwnerId] =
+    useState<number | null>(null);
   const [usageState, setUsageState] = useState<{
     userId: number;
     counts: Record<number, number>;
     error: boolean;
   } | null>(null);
+
+  // 會員收藏清單
+  const [memberBookmarks, setMemberBookmarks] =
+    useState<MemberBookmarks | null>(null);
+
+  // 收藏操作與登入視窗
+  const [isBookmarkSaving, setIsBookmarkSaving] = useState(false);
+  const [bookmarkNotice, setBookmarkNotice] = useState("");
+  const [isBookmarkAuthOpen, setIsBookmarkAuthOpen] = useState(false);
+
+  const bookmarkSavingRef = useRef(false);
+
+  // 只使用目前會員的收藏，避免切換帳號時顯示別人的資料
+  const currentBookmarks =
+    user && memberBookmarks?.ownerId === user.id ? memberBookmarks : null;
+
+  // 登入後取得自己的收藏清單
+  useEffect(() => {
+    if (isAuthLoading || !user) return;
+
+    const controller = new AbortController();
+    const ownerId = user.id;
+
+    async function loadBookmarks() {
+      try {
+        const response = await fetch("/api/bookmarks", {
+          credentials: "include",
+          cache: "no-store",
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error("無法取得收藏清單");
+        }
+
+        const data = await response.json();
+
+        if (
+          !Array.isArray(data.bookmarks) ||
+          !data.bookmarks.every(
+            (item: { syntax_id?: unknown } | null) =>
+              item !== null && typeof item.syntax_id === "number",
+          )
+        ) {
+          throw new Error("收藏清單格式異常");
+        }
+
+        const ids = data.bookmarks.map(
+          (item: { syntax_id: number }) => item.syntax_id,
+        );
+
+        if (!controller.signal.aborted) {
+          setMemberBookmarks({
+            ownerId,
+            ids,
+            error: false,
+          });
+        }
+      } catch {
+        if (!controller.signal.aborted) {
+          setMemberBookmarks({
+            ownerId,
+            ids: [],
+            error: true,
+          });
+        }
+      }
+    }
+
+    void loadBookmarks();
+
+    return () => controller.abort();
+  }, [user, isAuthLoading]);
 
   // 只查詢登入會員的累積次數；登出後不顯示會員使用狀態
   useEffect(() => {
@@ -109,10 +211,7 @@ export default function DictionaryPage() {
 
         const counts: Record<number, number> = {};
         for (const usage of data.usages) {
-          if (
-            typeof usage.id !== "number" ||
-            typeof usage.count !== "number"
-          ) {
+          if (typeof usage.id !== "number" || typeof usage.count !== "number") {
             throw new Error("使用次數格式異常");
           }
           counts[usage.id] = usage.count;
@@ -176,12 +275,26 @@ export default function DictionaryPage() {
   }, []);
 
   const isSearching = normalizeSearch(searchInput) !== "";
+
+  const isBookmarkFilterActive = Boolean(
+    !isAuthLoading &&
+      user &&
+      bookmarkFilterOwnerId === user.id &&
+      currentBookmarks &&
+      !currentBookmarks.error,
+  );
+
+  // 先選擇全部語法或目前會員的收藏，再搜尋與排序
+  const sourceSyntaxes = isBookmarkFilterActive
+    ? syntaxes.filter((syntax) => currentBookmarks?.ids.includes(syntax.id))
+    : syntaxes;
+
   // 搜尋先依符合程度；沒有搜尋或同等符合時，使用固定辭典排序
-  const visibleSyntaxes = syntaxes
+  const visibleSyntaxes = sourceSyntaxes
     .map((syntax) => ({ syntax, rank: searchRank(syntax, searchInput) }))
     .filter(({ rank }) => Number.isFinite(rank))
-    .sort((a, b) =>
-      a.rank - b.rank || compareDictionaryEntries(a.syntax, b.syntax),
+    .sort(
+      (a, b) => a.rank - b.rank || compareDictionaryEntries(a.syntax, b.syntax),
     )
     .map(({ syntax }) => syntax);
 
@@ -189,6 +302,72 @@ export default function DictionaryPage() {
     setSearchInput("");
     setHasSubmittedSearch(false);
     setExpandedSlug(null);
+  }
+
+  async function toggleBookmark(syntaxId: number) {
+    if (isAuthLoading || bookmarkSavingRef.current) return;
+
+    setBookmarkNotice("");
+
+    if (authError) {
+      setBookmarkNotice("無法確認登入狀態，請重新整理後再試。");
+      return;
+    }
+
+    if (!user) {
+      setIsBookmarkAuthOpen(true);
+      return;
+    }
+
+    if (!currentBookmarks || currentBookmarks.error) return;
+
+    const ownerId = user.id;
+    const wasBookmarked = currentBookmarks.ids.includes(syntaxId);
+
+    bookmarkSavingRef.current = true;
+    setIsBookmarkSaving(true);
+
+    try {
+      const response = await fetch(`/api/bookmarks/${syntaxId}`, {
+        method: wasBookmarked ? "DELETE" : "PUT",
+        credentials: "include",
+      });
+
+      if (response.status === 401) {
+        setBookmarkNotice("登入已失效，請重新登入後再操作。");
+        setIsBookmarkAuthOpen(true);
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          wasBookmarked
+            ? "無法取消收藏，請稍後再試。"
+            : "無法加入收藏，請稍後再試。",
+        );
+      }
+
+      // 後端成功後，才更新圖示
+      setMemberBookmarks((previous) => {
+        if (!previous || previous.ownerId !== ownerId) {
+          return previous;
+        }
+
+        return {
+          ...previous,
+          ids: wasBookmarked
+            ? previous.ids.filter((id) => id !== syntaxId)
+            : [...new Set([...previous.ids, syntaxId])],
+        };
+      });
+    } catch (error) {
+      setBookmarkNotice(
+        error instanceof Error ? error.message : "無法更新收藏，請稍後再試。",
+      );
+    } finally {
+      bookmarkSavingRef.current = false;
+      setIsBookmarkSaving(false);
+    }
   }
 
   return (
@@ -247,8 +426,25 @@ export default function DictionaryPage() {
         </div>
       </form>
 
-      {!isLoading && !error && syntaxes.length > 0 &&
-        isSearching && hasSubmittedSearch && visibleSyntaxes.length === 0 && (
+      {bookmarkNotice && (
+        <p className={styles.error} role="alert">
+          {bookmarkNotice}
+        </p>
+      )}
+
+      {!isAuthLoading && user && currentBookmarks?.error && (
+        <p className={styles.error} role="alert">
+          無法載入收藏清單，請重新整理再試。
+        </p>
+      )}
+
+      {!isLoading &&
+        !error &&
+        !isBookmarkFilterActive &&
+        syntaxes.length > 0 &&
+        isSearching &&
+        hasSubmittedSearch &&
+        visibleSyntaxes.length === 0 && (
           <p className={styles.noResults} role="status">
             找不到符合的語法，請試試其他關鍵字。
           </p>
@@ -264,12 +460,52 @@ export default function DictionaryPage() {
         </p>
       ) : (
         <section className={styles.dictionary} aria-labelledby="language-title">
-          <h2 id="language-title" className={styles.languageTitle}>
-            Python · 共 {visibleSyntaxes.length} 項
-          </h2>
+          <div className={styles.summary}>
+            <h2 id="language-title" className={styles.languageTitle}>
+              Python · 共 {visibleSyntaxes.length} 項
+            </h2>
+
+            {!isAuthLoading && user && (
+              <button
+                type="button"
+                className={`${styles.bookmarkFilter} ${
+                  isBookmarkFilterActive ? styles.bookmarkFilterActive : ""
+                }`}
+                aria-pressed={isBookmarkFilterActive}
+                disabled={
+                  isLoading ||
+                  Boolean(error) ||
+                  isBookmarkSaving ||
+                  !currentBookmarks ||
+                  currentBookmarks.error
+                }
+                onClick={() => {
+                  setBookmarkFilterOwnerId(
+                    isBookmarkFilterActive ? null : user.id,
+                  );
+
+                  // 切換篩選時收合說明，保留搜尋文字
+                  setExpandedSlug(null);
+                }}
+              >
+                <span aria-hidden="true">
+                  {isBookmarkFilterActive ? "●" : "○"}
+                </span>
+                <span>僅顯示我的收藏</span>
+              </button>
+            )}
+          </div>
 
           {syntaxes.length === 0 ? (
             <p className={styles.message}>目前尚無語法資料。</p>
+          ) : isBookmarkFilterActive && visibleSyntaxes.length === 0 ? (
+            (!isSearching || hasSubmittedSearch) && (
+              <p className={styles.emptyBookmarks} role="status">
+                {sourceSyntaxes.length === 0
+                  ? "尚未收藏任何語法，可點選語法前方的書籤圖示加入收藏。"
+                  : "收藏中找不到符合的語法，請試試其他關鍵字。"}
+              </p>
+            )
           ) : (
             <ul className={styles.list}>
               {visibleSyntaxes.map((syntax) => {
@@ -277,6 +513,14 @@ export default function DictionaryPage() {
                 const hasUsed = Boolean(
                   user && currentUsage && !currentUsage.error && usageCount > 0,
                 );
+                const isBookmarked =
+                  currentBookmarks?.ids.includes(syntax.id) ?? false;
+                const bookmarkDisabled =
+                  isAuthLoading ||
+                  isBookmarkSaving ||
+                  Boolean(
+                    user && (!currentBookmarks || currentBookmarks.error),
+                  );
                 const isExpanded = expandedSlug === syntax.slug;
                 const buttonId = `dictionary-button-${syntax.slug}`;
                 const panelId = `dictionary-panel-${syntax.slug}`;
@@ -288,46 +532,84 @@ export default function DictionaryPage() {
                       isExpanded ? styles.expanded : ""
                     }`}
                   >
-                    <button
-                      id={buttonId}
-                      type="button"
-                      className={styles.row}
-                      aria-expanded={isExpanded}
-                      aria-controls={panelId}
-                      onClick={() => {
-                        setExpandedSlug((current) =>
-                          current === syntax.slug ? null : syntax.slug,
-                        );
-                      }}
-                    >
-                      <span
-                        className={`${styles.name} ${hasUsed ? styles.usedName : ""}`}
+                    <div className={styles.headingRow}>
+                      <button
+                        type="button"
+                        className={`${styles.bookmarkButton} ${
+                          isBookmarked ? styles.bookmarked : ""
+                        }`}
+                        aria-label={
+                          isBookmarked
+                            ? `取消收藏 ${syntax.name}`
+                            : `收藏 ${syntax.name}`
+                        }
+                        aria-pressed={isBookmarked}
+                        disabled={bookmarkDisabled}
+                        onClick={() => {
+                          void toggleBookmark(syntax.id);
+                        }}
                       >
-                        {syntax.name}
-                        {syntax.display_label &&
-                          syntax.display_label !== syntax.name && (
-                            <span className={styles.displayLabel}>
-                              {"　· "}{syntax.display_label}
-                            </span>
-                          )}
-                      </span>
-
-                      {!isAuthLoading && user && (
-                        <span
-                          className={`${styles.usage} ${hasUsed ? styles.usedUsage : ""}`}
+                        <svg
+                          viewBox="0 0 24 24"
+                          width="22"
+                          height="22"
+                          fill={isBookmarked ? "currentColor" : "none"}
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
                         >
-                          {!currentUsage
-                            ? "載入中…"
-                            : currentUsage.error
-                              ? "次數載入失敗"
-                              : hasUsed
-                                ? `✓ 已使用 ${usageCount} 次`
-                                : "○ 尚未使用"}
-                        </span>
-                      )}
+                          <path d="M6 3h12v18l-6-4-6 4V3Z" />
+                        </svg>
+                      </button>
 
-                      <span aria-hidden="true">{isExpanded ? "−" : "+"}</span>
-                    </button>
+                      <button
+                        id={buttonId}
+                        type="button"
+                        className={styles.row}
+                        aria-expanded={isExpanded}
+                        aria-controls={panelId}
+                        onClick={() => {
+                          setExpandedSlug((current) =>
+                            current === syntax.slug ? null : syntax.slug,
+                          );
+                        }}
+                      >
+                        <span
+                          className={`${styles.name} ${
+                            hasUsed ? styles.usedName : ""
+                          }`}
+                        >
+                          {syntax.name}
+
+                          {syntax.display_label &&
+                            syntax.display_label !== syntax.name && (
+                              <span className={styles.displayLabel}>
+                                {"　· "}
+                                {syntax.display_label}
+                              </span>
+                            )}
+                        </span>
+
+                        {!isAuthLoading && user && (
+                          <span
+                            className={`${styles.usage} ${
+                              hasUsed ? styles.usedUsage : ""
+                            }`}
+                          >
+                            {!currentUsage
+                              ? "載入中…"
+                              : currentUsage.error
+                                ? "次數載入失敗"
+                                : hasUsed
+                                  ? `✓ 已使用 ${usageCount} 次`
+                                  : "○ 尚未使用"}
+                          </span>
+                        )}
+
+                        <span aria-hidden="true">{isExpanded ? "−" : "+"}</span>
+                      </button>
+                    </div>
 
                     <div
                       id={panelId}
@@ -351,6 +633,16 @@ export default function DictionaryPage() {
             </ul>
           )}
         </section>
+      )}
+      {isBookmarkAuthOpen && (
+        <AuthDialog
+          onClose={() => setIsBookmarkAuthOpen(false)}
+          onSignedIn={(currentUser) => {
+            completeSignin(currentUser);
+            setIsBookmarkAuthOpen(false);
+            setBookmarkNotice("");
+          }}
+        />
       )}
     </>
   );
