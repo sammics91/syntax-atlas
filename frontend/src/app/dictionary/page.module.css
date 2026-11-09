@@ -1,3 +1,91 @@
+/*-- 搜尋欄 --*/
+.search {
+  width: 100%;
+  max-width: 620px;
+  margin: 24px 9px 0;
+}
+
+.searchRow {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  min-height: 45px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.searchRow:focus-within {
+  outline: 2px solid var(--chart-gray);
+  outline-offset: 3px;
+}
+
+.searchRow input {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 5px 0 0 5px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+}
+
+.searchRow input:focus {
+  outline: none;
+}
+
+.clearSearch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  flex-shrink: 0;
+  gap: 4px;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--primary);
+  font: inherit;
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.clearSearch:hover {
+  background: var(--soft-bg);
+}
+
+.submitSearch {
+  flex-shrink: 0;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 0 5px 5px 0;
+  background: var(--primary);
+  color: var(--surface);
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.search button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -4px;
+}
+
+.search .submitSearch:focus-visible {
+  outline-color: var(--surface);
+}
+
+.search button:disabled,
+.search input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /*-- 載入、錯誤與空清單提示 --*/
 .message,
 .error {
@@ -11,6 +99,12 @@
 
 .error {
   color: var(--error);
+}
+
+.noResults {
+  margin: 12px 0 0;
+  color: var(--text-muted);
+  line-height: 1.6;
 }
 
 /*-- 語言標題 --*/

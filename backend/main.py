@@ -88,7 +88,9 @@ def get_syntaxes():
                     s.slug,
                     s.name,
                     s.display_label,
+                    c.name AS category_name,
                     COALESCE(s.summary, '') AS summary,
+                    COALESCE(s.example_description, '') AS example_description,
                     COALESCE(s.example_code, '') AS example_code
                 FROM syntaxes AS s
                 JOIN syntax_categories AS c

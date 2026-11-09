@@ -11,9 +11,67 @@ type SyntaxEntry = {
   slug: string;
   name: string;
   display_label: string | null;
+  category_name: string;
   summary: string;
+  example_description: string;
   example_code: string;
 };
+
+// 搜尋時忽略大小寫、全半形與排版空白
+function normalizeSearch(text: string) {
+  return text.normalize("NFKC").toLowerCase().replace(/\s+/g, "");
+}
+
+function searchRank(syntax: SyntaxEntry, keyword: string) {
+  const query = normalizeSearch(keyword);
+  if (!query) return 0;
+
+  const names = [syntax.name, syntax.display_label].map((text) =>
+    normalizeSearch(text ?? ""),
+  );
+
+  if (names.some((name) => name === query)) return 0;
+  if (names.some((name) => name.startsWith(query))) return 1;
+  if (names.some((name) => name.includes(query))) return 2;
+  if (normalizeSearch(syntax.summary ?? "").includes(query)) return 3;
+  if (normalizeSearch(syntax.example_description ?? "").includes(query)) return 4;
+  if (normalizeSearch(syntax.category_name ?? "").includes(query)) return 5;
+
+  return Infinity;
+}
+
+// 辭典預設分組：英文名稱、數字與常值、符號
+function dictionaryGroup(syntax: SyntaxEntry) {
+  const name = normalizeSearch(syntax.name);
+  if (/^[0-9]/.test(name) || /-(literal|constant)$/.test(syntax.slug)) return 1;
+  return /^[a-z]/.test(name) ? 0 : 2;
+}
+
+function compareDictionaryEntries(a: SyntaxEntry, b: SyntaxEntry) {
+  const groupA = dictionaryGroup(a);
+  const groupB = dictionaryGroup(b);
+  if (groupA !== groupB) return groupA - groupB;
+
+  const nameA = normalizeSearch(a.name);
+  const nameB = normalizeSearch(b.name);
+
+  if (groupA === 2) {
+    // 同族符號相鄰，例如 +、+=、+x，以及 *、**、**=。
+    const families = [
+      "+", "-", "*", "/", "%", "@", "<", ">", "=", "!",
+      "&", "|", "^", "~", ":", "[", "(", "{",
+    ];
+    const familyIndex = (name: string) => {
+      const index = families.indexOf(name[0]);
+      return index === -1 ? families.length : index;
+    };
+    const familyDifference = familyIndex(nameA) - familyIndex(nameB);
+    if (familyDifference !== 0) return familyDifference;
+    if (nameA !== nameB) return nameA < nameB ? -1 : 1;
+  }
+
+  return nameA.localeCompare(nameB, "en", { sensitivity: "base" }) || a.id - b.id;
+}
 
 export default function DictionaryPage() {
   const { user, isAuthLoading } = useAuth();
@@ -21,6 +79,8 @@ export default function DictionaryPage() {
   const [expandedSlug, setExpandedSlug] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [hasSubmittedSearch, setHasSubmittedSearch] = useState(false);
   const [usageState, setUsageState] = useState<{
     userId: number;
     counts: Record<number, number>;
@@ -115,6 +175,22 @@ export default function DictionaryPage() {
     return () => controller.abort();
   }, []);
 
+  const isSearching = normalizeSearch(searchInput) !== "";
+  // 搜尋先依符合程度；沒有搜尋或同等符合時，使用固定辭典排序
+  const visibleSyntaxes = syntaxes
+    .map((syntax) => ({ syntax, rank: searchRank(syntax, searchInput) }))
+    .filter(({ rank }) => Number.isFinite(rank))
+    .sort((a, b) =>
+      a.rank - b.rank || compareDictionaryEntries(a.syntax, b.syntax),
+    )
+    .map(({ syntax }) => syntax);
+
+  function clearSearch() {
+    setSearchInput("");
+    setHasSubmittedSearch(false);
+    setExpandedSlug(null);
+  }
+
   return (
     <>
       <h1 className="page-title">我的語法辭典</h1>
@@ -122,6 +198,61 @@ export default function DictionaryPage() {
       <p className="page-description">
         隨時查閱語法說明與範例，掌握已使用與尚未探索的語法。
       </p>
+
+      <form
+        className={styles.search}
+        role="search"
+        onSubmit={(event) => {
+          event.preventDefault();
+          setHasSubmittedSearch(isSearching);
+          setExpandedSlug(null);
+        }}
+      >
+        <div className={styles.searchRow}>
+          <input
+            id="syntax-search"
+            type="text"
+            enterKeyHint="search"
+            aria-label="搜尋語法辭典"
+            placeholder="搜尋語法、中文名稱、用途或關鍵字"
+            autoComplete="off"
+            value={searchInput}
+            disabled={isLoading || Boolean(error)}
+            onChange={(event) => {
+              setSearchInput(event.target.value);
+              setHasSubmittedSearch(false);
+              setExpandedSlug(null);
+            }}
+          />
+
+          {searchInput && (
+            <button
+              type="button"
+              className={styles.clearSearch}
+              aria-label="清除搜尋"
+              onClick={clearSearch}
+            >
+              <span aria-hidden="true">×</span>
+              <span>清除搜尋</span>
+            </button>
+          )}
+
+          <button
+            type="submit"
+            className={styles.submitSearch}
+            disabled={isLoading || Boolean(error)}
+          >
+            搜尋
+          </button>
+        </div>
+      </form>
+
+      {!isLoading && !error && syntaxes.length > 0 &&
+        isSearching && hasSubmittedSearch && visibleSyntaxes.length === 0 && (
+          <p className={styles.noResults} role="status">
+            找不到符合的語法，請試試其他關鍵字。
+          </p>
+        )}
 
       {isLoading ? (
         <p className={styles.message} role="status">
@@ -134,14 +265,14 @@ export default function DictionaryPage() {
       ) : (
         <section className={styles.dictionary} aria-labelledby="language-title">
           <h2 id="language-title" className={styles.languageTitle}>
-            Python · 共 {syntaxes.length} 項
+            Python · 共 {visibleSyntaxes.length} 項
           </h2>
 
           {syntaxes.length === 0 ? (
             <p className={styles.message}>目前尚無語法資料。</p>
           ) : (
             <ul className={styles.list}>
-              {syntaxes.map((syntax) => {
+              {visibleSyntaxes.map((syntax) => {
                 const usageCount = currentUsage?.counts[syntax.id] ?? 0;
                 const hasUsed = Boolean(
                   user && currentUsage && !currentUsage.error && usageCount > 0,
