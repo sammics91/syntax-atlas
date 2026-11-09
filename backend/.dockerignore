@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+
+.env
+.env.*
+!.env.example
+
+data/
+database/
+import_*.py
+fetch_python_chapters.py
+
+*.pem
+*.sql
+*.tar

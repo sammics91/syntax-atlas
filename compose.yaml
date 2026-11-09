@@ -1,0 +1,33 @@
+name: syntax-atlas
+
+services:
+  backend:
+    image: syntax-atlas-backend:v1.0.0
+
+    build:
+      context: ./backend
+
+    env_file:
+      - ./backend/.env
+
+    environment:
+      # 容器連到 Windows 上的 MySQL
+      DB_HOST: host.docker.internal
+
+    restart: unless-stopped
+
+  frontend:
+    image: syntax-atlas-frontend:v1.0.0
+
+    build:
+      context: ./frontend
+      args:
+        API_INTERNAL_URL: http://backend:8000
+
+    ports:
+      - "127.0.0.1:8081:3000"
+
+    depends_on:
+      - backend
+
+    restart: unless-stopped
