@@ -1,0 +1,188 @@
+/* 共用文字操作 */
+.textButton {
+  padding: 0px;
+  border: none;
+  background: transparent;
+  color: var(--primary);
+  font: inherit;
+  font-size: 14px;
+  text-decoration: none;
+  line-height: 1.6;
+}
+
+/* 滑過時變金色，並顯示底線 */
+.textButton:hover:not(:disabled) {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.textButton:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.textButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* 載入與錯誤提示 */
+.notice,
+.error {
+  margin: 20px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.notice {
+  color: var(--text-muted);
+}
+
+.error {
+  color: var(--error);
+}
+
+/* 會員資訊表單 */
+.profileForm {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  margin-top: 28px;
+}
+
+/* 與登入／註冊欄位一致：左側標籤、右側內容 */
+.field {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 11px;
+  padding-right: 2px;
+}
+
+/* 統一標籤與內容的文字行高 */
+.field > label,
+.field > span:first-child,
+.nameInput,
+.emailValue,
+.registeredAt {
+  line-height: 22px;
+}
+
+.field > label,
+.field > span:first-child {
+  padding-left: 9px;
+  color: var(--text);
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+/* 註冊日期標籤使用較小文字 */
+.field > span.registeredLabel:first-child {
+  font-size: 14px;
+}
+
+/* 暱稱：平時像文字，保留透明邊框避免聚焦時跳動 */
+.nameInput {
+  width: 100%;
+  min-width: 0;
+  padding: 6px 12px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+}
+
+.nameInput:focus {
+  border-color: var(--border);
+  outline: 2px solid var(--chart-gray);
+  outline-offset: 2px;
+  background-color: var(--surface);
+}
+
+/* Email 與暱稱內容保持相同的對齊方式 */
+.emailValue {
+  min-width: 0;
+  padding: 6px 13px;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.3;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+/* 註冊日期：先使用一般文字大小 */
+.registeredAt {
+  min-width: 0;
+  padding: 6px 13px;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.3;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+/* 修改密碼：標籤較長，預留足夠寬度 */
+.profileForm .passwordField {
+  grid-template-columns: 84px minmax(0, 1fr);
+}
+
+.passwordField input {
+  text-align: left;
+}
+
+/* 修改成功提示 */
+.message {
+  margin: 9px;
+  color: var(--primary);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* 主按鈕沿用登入／註冊樣式 */
+.mainButton:disabled {
+  cursor: default;
+}
+
+.mainButton:hover:disabled {
+  filter: none;
+}
+
+/* 表單外的底部連結，間距比照登入視窗 */
+.bottomLinks {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.deleteButton {
+  color: var(--error);
+}
+
+/* 刪除帳號：說明永久移除的資料範圍 */
+.deleteDescription {
+  margin: 0 0 8px;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+/* 刪除操作以紅色主按鈕區分 */
+.profileForm .deleteSubmit {
+  background-color: var(--error);
+}
+
+.deleteSubmit:disabled {
+  cursor: default;
+}
+
+.deleteSubmit:hover:disabled {
+  filter: none;
+}

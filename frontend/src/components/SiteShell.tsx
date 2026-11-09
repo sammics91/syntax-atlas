@@ -16,6 +16,7 @@ import { usePathname, useRouter } from "next/navigation";
 
 // 自訂元件與型別
 import AuthDialog from "./AuthDialog";
+import ProfileDialog from "./ProfileDialog";
 import ResetPasswordDialog from "./ResetPasswordDialog";
 import { useAuth } from "./AuthProvider";
 
@@ -42,6 +43,9 @@ export default function SiteShell({ children }: { children: ReactNode }) {
 
   // 登入視窗控制
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+
+  // 會員資訊視窗控制
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   // 登入視窗額外顯示的提示
   const [authNotice, setAuthNotice] = useState("");
@@ -144,18 +148,26 @@ export default function SiteShell({ children }: { children: ReactNode }) {
     };
   }, [pathname]);
 
-  // 重設成功返回首頁後，提示使用新密碼登入
+  // 密碼重設或修改成功後，提示重新登入
   useEffect(() => {
     const url = new URL(window.location.href);
 
-    if (url.searchParams.get("password-reset") !== "success") {
-      return;
-    }
+    const passwordReset = url.searchParams.get("password-reset") === "success";
 
-    setAuthNotice("密碼已重設，請使用新密碼重新登入。");
+    const passwordUpdated =
+      url.searchParams.get("password-updated") === "success";
+
+    if (!passwordReset && !passwordUpdated) return;
+
+    setAuthNotice(
+      passwordUpdated
+        ? "密碼已更新，請使用新密碼重新登入。"
+        : "密碼已重設，請使用新密碼重新登入。",
+    );
     setIsAuthOpen(true);
 
     url.searchParams.delete("password-reset");
+    url.searchParams.delete("password-updated");
 
     window.history.replaceState(
       window.history.state,
@@ -195,33 +207,43 @@ export default function SiteShell({ children }: { children: ReactNode }) {
           </div>
 
           <div className="site-account">
-            <span
-              className={`account-name${authError ? " account-name-error" : ""}`}
-              title={authError || undefined}
-            >
-              {isAuthLoading
-                ? "確認中…"
-                : user
-                  ? user.name
-                  : authError
-                    ? "狀態未確認"
-                    : "訪客"}
-            </span>
+            {user ? (
+              <button
+                type="button"
+                className="account-name account-profile-button"
+                onClick={() => setIsProfileOpen(true)}
+                disabled={isSigningOut}
+                aria-haspopup="dialog"
+              >
+                {user.name}
+              </button>
+            ) : (
+              <span
+                className={`account-name${authError ? " account-name-error" : ""}`}
+                title={authError || undefined}
+              >
+                {isAuthLoading ? "確認中…" : authError ? "狀態未確認" : "訪客"}
+              </span>
+            )}
 
             {user ? (
               <button
                 type="button"
                 className="login-button"
-                onClick={signout}
                 disabled={isSigningOut}
+                onClick={() => {
+                  if (window.matchMedia("(max-width: 440px)").matches) {
+                    setIsProfileOpen(true);
+                  } else {
+                    void signout();
+                  }
+                }}
               >
                 <span className="account-label-desktop">
                   {isSigningOut ? "登出中…" : "登出"}
                 </span>
 
-                <span className="account-label-mobile">
-                  {isSigningOut ? "登出中…" : `${user.name} · 登出`}
-                </span>
+                <span className="account-label-mobile">{user.name}</span>
               </button>
             ) : (
               <button
@@ -302,6 +324,20 @@ export default function SiteShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       </footer>
+
+      {user && isProfileOpen && resetToken === null && (
+        <ProfileDialog
+          open={isProfileOpen}
+          onClose={() => setIsProfileOpen(false)}
+          onUserUpdated={completeSignin}
+          onPasswordChanged={() => {
+            window.location.replace("/?password-updated=success");
+          }}
+          onAccountDeleted={() => {
+            window.location.replace("/");
+          }}
+        />
+      )}
 
       {resetToken !== null && (
         <ResetPasswordDialog
