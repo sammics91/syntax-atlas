@@ -133,6 +133,13 @@ def count_literal_types(tree):
                 counts["fstring"] += 1
             continue
 
+        # case True／False／None 使用 MatchSingleton，不是 Constant。
+        if isinstance(node, ast.MatchSingleton):
+            kind = type_names.get(type(node.value))
+            if kind is not None:
+                counts[kind] += 1
+            continue
+
         if not isinstance(node, ast.Constant):
             continue
 
@@ -183,6 +190,15 @@ def count_augmented_operators(tree):
     )
 
 
+def count_compound_clauses(tree):
+    # finally 沒有獨立節點，依 try 是否具有 finalbody 判斷。
+    counts = Counter()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Try, ast.TryStar)) and node.finalbody:
+            counts["finally"] += 1
+    return counts
+
+
 # 依資料庫規則分析 Python 程式碼
 def analyze_python(code: str):
     # 語法錯誤會交給 main.py 處理
@@ -207,6 +223,7 @@ def analyze_python(code: str):
     literal_counts = count_literal_types(tree)
     unpacking_counts = count_unpacking(tree)
     augmented_counts = count_augmented_operators(tree)
+    compound_counts = count_compound_clauses(tree)
 
     # 統計關鍵字，排除字串與註解
     tokens = tokenize.generate_tokens(io.StringIO(code).readline)
@@ -275,6 +292,12 @@ def analyze_python(code: str):
             and rule["rule_type"] == "augmented_operator"
         ):
             count = augmented_counts[rule["match_value"]]
+
+        elif (
+            rule["analyzer"] == "python_ast"
+            and rule["rule_type"] == "compound_clause"
+        ):
+            count = compound_counts[rule["match_value"]]
 
         else:
             # 略過未支援的規則

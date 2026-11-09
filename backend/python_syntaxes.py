@@ -7,7 +7,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 MIGRATIONS = ROOT / 'database' / 'migrations'
 SEPARATOR = '\n-- @statement\n'
-CATEGORIES = {'variables-and-data': ('變數與資料', 5), 'control-flow': ('流程控制', 10), 'functions': ('函式', 20), 'keywords': ('關鍵字', 30)}
+CATEGORIES = {
+    'variables-and-data': ('變數與資料', 5),
+    'control-flow': ('流程控制', 10),
+    'functions': ('函式', 20),
+    'classes-and-objects': ('類別與物件', 25),
+    'keywords': ('關鍵字', 30),
+}
 
 def sql_value(value):
     # 使用 UTF-8 十六進位字串，避免引號與換行影響 SQL。
