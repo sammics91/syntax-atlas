@@ -174,6 +174,15 @@ def count_unpacking(tree):
     return counts
 
 
+def count_augmented_operators(tree):
+    # += 等依 AugAssign 辨識，與一般指派及二元運算分開。
+    return Counter(
+        type(node.op).__name__
+        for node in ast.walk(tree)
+        if isinstance(node, ast.AugAssign)
+    )
+
+
 # 依資料庫規則分析 Python 程式碼
 def analyze_python(code: str):
     # 語法錯誤會交給 main.py 處理
@@ -197,6 +206,7 @@ def analyze_python(code: str):
     boolean_counts = count_boolean_operators(tree)
     literal_counts = count_literal_types(tree)
     unpacking_counts = count_unpacking(tree)
+    augmented_counts = count_augmented_operators(tree)
 
     # 統計關鍵字，排除字串與註解
     tokens = tokenize.generate_tokens(io.StringIO(code).readline)
@@ -259,6 +269,12 @@ def analyze_python(code: str):
             and rule["rule_type"] == "unpacking"
         ):
             count = unpacking_counts[rule["match_value"]]
+
+        elif (
+            rule["analyzer"] == "python_ast"
+            and rule["rule_type"] == "augmented_operator"
+        ):
+            count = augmented_counts[rule["match_value"]]
 
         else:
             # 略過未支援的規則
