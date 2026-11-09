@@ -10,8 +10,18 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 只複製執行 API 需要的程式
-COPY main.py database.py analyzer.py auth.py records.py syntax_statistics.py ./
+# 複製 API 與維護工具需要的程式
+COPY main.py \
+     database.py \
+     analyzer.py \
+     auth.py \
+     records.py \
+     syntax_statistics.py \
+     bookmarks.py \
+     password_reset.py \
+     mailer.py \
+     cleanup_sessions.py \
+     ./
 
 # 使用一般帳號執行
 RUN useradd --create-home appuser
