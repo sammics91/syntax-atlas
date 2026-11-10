@@ -23,6 +23,7 @@ type DeleteMode = "code-only" | "all";
 
 export default function RecordsPage() {
   const { user } = useAuth();
+  const userId = user?.id;
 
   const [records, setRecords] = useState<CodeRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -38,7 +39,7 @@ export default function RecordsPage() {
 
   // 取得目前登入會員的程式碼紀錄
   useEffect(() => {
-    if (!user) return;
+    if (userId === undefined) return;
 
     const controller = new AbortController();
 
@@ -86,7 +87,7 @@ export default function RecordsPage() {
     loadRecords();
 
     return () => controller.abort();
-  }, [user?.id]);
+  }, [userId]);
 
   // 選擇要刪除的紀錄後，開啟確認視窗
   useEffect(() => {

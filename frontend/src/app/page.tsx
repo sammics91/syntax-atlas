@@ -40,11 +40,17 @@ export default function HomePage() {
 }
 
 function HomePageRoute() {
-  // 取得網址的 record
   const searchParams = useSearchParams();
   const recordId = searchParams.get("record");
+  const { user } = useAuth();
 
-  return <HomeEditor key={recordId ?? "new"} recordId={recordId} />;
+  // 切換紀錄或編輯紀錄的會員時，重新建立編輯器
+  const editorKey =
+    recordId === null
+      ? "new"
+      : `record-${recordId}-user-${user?.id ?? "guest"}`;
+
+  return <HomeEditor key={editorKey} recordId={recordId} />;
 }
 
 function HomeEditor({ recordId }: { recordId: string | null }) {
@@ -56,6 +62,7 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
   const [expandedSlug, setExpandedSlug] = useState<string | null>(null);
 
   const { user, isAuthLoading, authError, completeSignin } = useAuth();
+  const userId = user?.id;
 
   const [isSaving, setIsSaving] = useState(false);
   const [savedRecordNumber, setSavedRecordNumber] = useState<number | null>(
@@ -73,7 +80,9 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
     user_id: number;
   } | null>(null);
 
-  const [recordError, setRecordError] = useState("");
+  const [recordError, setRecordError] = useState(
+    recordId !== null && !/^[1-9]\d*$/.test(recordId) ? "紀錄編號不正確。" : "",
+  );
 
   // 有指定紀錄時，必須先成功讀取才能操作
   const isEditorReady =
@@ -85,26 +94,14 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
 
   // 開啟編輯網址時，讀取原本儲存的名稱與程式碼
   useEffect(() => {
-    if (recordId === null) return;
-
-    setEditingRecord(null);
-    setRecordError("");
-    setTitle("");
-    setCode("");
-    setResult(null);
-    setExpandedSlug(null);
-    setSavedRecordNumber(null);
-    setError("");
-
-    if (!/^[1-9]\d*$/.test(recordId)) {
-      setRecordError("紀錄編號不正確。");
+    if (recordId === null || !/^[1-9]\d*$/.test(recordId)) {
       return;
     }
 
-    if (isAuthLoading || !user) return;
+    if (isAuthLoading || userId === undefined) return;
 
     const controller = new AbortController();
-    const currentUserId = user.id;
+    const currentUserId = userId;
 
     async function loadRecord() {
       try {
@@ -157,7 +154,7 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
     void loadRecord();
 
     return () => controller.abort();
-  }, [recordId, user?.id, isAuthLoading]);
+  }, [recordId, userId, isAuthLoading]);
 
   // 分析成功、結果顯示後，將儲存按鈕與結果移到可見的位置
   useEffect(() => {
@@ -538,7 +535,10 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
                         {syntax.name}
                         {syntax.display_label &&
                           syntax.display_label !== syntax.name && (
-                            <span>{"　· "}{syntax.display_label}</span>
+                            <span>
+                              {"　· "}
+                              {syntax.display_label}
+                            </span>
                           )}
                       </span>
 

@@ -2,6 +2,7 @@
 
 // React
 import {
+  Suspense,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -12,7 +13,7 @@ import {
 // Next.js
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 // 自訂元件與型別
 import AuthDialog from "./AuthDialog";
@@ -28,8 +29,28 @@ const navigation = [
 ];
 
 export default function SiteShell({ children }: { children: ReactNode }) {
+  return (
+    <Suspense fallback={<p role="status">正在載入網站…</p>}>
+      <SiteShellContent>{children}</SiteShellContent>
+    </Suspense>
+  );
+}
+
+function SiteShellContent({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+
+  const searchParams = useSearchParams();
+
+  const passwordReset = searchParams.get("password-reset") === "success";
+
+  const passwordUpdated = searchParams.get("password-updated") === "success";
+
+  const passwordNotice = passwordUpdated
+    ? "密碼已更新，請使用新密碼重新登入。"
+    : passwordReset
+      ? "密碼已重設，請使用新密碼重新登入。"
+      : "";
 
   // 從 AuthProvider 取得共用會員狀態
   const {
@@ -148,34 +169,6 @@ export default function SiteShell({ children }: { children: ReactNode }) {
     };
   }, [pathname]);
 
-  // 密碼重設或修改成功後，提示重新登入
-  useEffect(() => {
-    const url = new URL(window.location.href);
-
-    const passwordReset = url.searchParams.get("password-reset") === "success";
-
-    const passwordUpdated =
-      url.searchParams.get("password-updated") === "success";
-
-    if (!passwordReset && !passwordUpdated) return;
-
-    setAuthNotice(
-      passwordUpdated
-        ? "密碼已更新，請使用新密碼重新登入。"
-        : "密碼已重設，請使用新密碼重新登入。",
-    );
-    setIsAuthOpen(true);
-
-    url.searchParams.delete("password-reset");
-    url.searchParams.delete("password-updated");
-
-    window.history.replaceState(
-      window.history.state,
-      "",
-      `${url.pathname}${url.search}${url.hash}`,
-    );
-  }, []);
-
   // 關閉視窗時，一併移除網址上的重設憑證
   function handleCloseResetPassword() {
     const url = new URL(window.location.href);
@@ -259,12 +252,24 @@ export default function SiteShell({ children }: { children: ReactNode }) {
           </div>
         </div>
 
-        {isAuthOpen && resetToken === null && (
+        {(isAuthOpen || Boolean(passwordNotice)) && resetToken === null && (
           <AuthDialog
-            notice={authNotice}
+            key={passwordNotice || "normal"}
+            notice={passwordNotice || authNotice}
             onClose={() => {
               setIsAuthOpen(false);
               setAuthNotice("");
+
+              if (passwordNotice) {
+                const url = new URL(window.location.href);
+
+                url.searchParams.delete("password-reset");
+                url.searchParams.delete("password-updated");
+
+                router.replace(`${url.pathname}${url.search}${url.hash}`, {
+                  scroll: false,
+                });
+              }
             }}
             onSignedIn={completeSignin}
           />
