@@ -21,7 +21,12 @@ COPY main.py \
      password_reset.py \
      mailer.py \
      cleanup_sessions.py \
+     python_syntaxes.py \
+     migrate.py \
      ./
+
+# 複製部署時需要的資料庫更新 SQL
+COPY database/ ./database/
 
 # 使用一般帳號執行
 RUN useradd --create-home appuser

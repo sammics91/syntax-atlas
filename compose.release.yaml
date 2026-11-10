@@ -1,0 +1,10 @@
+services:
+  backend:
+    image: ghcr.io/sammics91/syntax-atlas-backend:${RELEASE_SHA:?請設定發布版本}
+    environment:
+      RESEND_API_KEY: ${RESEND_API_KEY:?請設定 Resend API Key}
+      MAIL_FROM: ${MAIL_FROM:?請設定寄件人}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:?請設定正式網站網址}
+
+  frontend:
+    image: ghcr.io/sammics91/syntax-atlas-frontend:${RELEASE_SHA:?請設定發布版本}

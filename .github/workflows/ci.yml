@@ -13,7 +13,7 @@ permissions:
 # 同一個分支有新提交時，取消上一輪尚未完成的檢查
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   backend:
@@ -48,6 +48,9 @@ jobs:
         run: |
           docker run --rm syntax-atlas-backend:ci \
             python -c "from main import app; print('API 載入成功，路由數：', len(app.routes))"
+
+      - name: Check database migrations in backend image
+        run: docker run --rm syntax-atlas-backend:ci python migrate.py
 
   frontend:
     name: 前端檢查與 Docker 建置
@@ -140,6 +143,9 @@ jobs:
             --tag "$FRONTEND_IMAGE:$IMAGE_TAG" \
             ./frontend
 
+      - name: Check database migrations in release image
+        run: docker run --rm "$BACKEND_IMAGE:$IMAGE_TAG" python migrate.py
+
       - name: 上傳前後端映像
         run: |
           docker push "$BACKEND_IMAGE:$IMAGE_TAG"
@@ -153,3 +159,157 @@ jobs:
             echo "- Backend: \`$BACKEND_IMAGE:$IMAGE_TAG\`"
             echo "- Frontend: \`$FRONTEND_IMAGE:$IMAGE_TAG\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: 部署到 EC2
+    needs: [publish]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      AWS_REGION: ap-east-2
+      EC2_SECURITY_GROUP_ID: sg-0d38126427579adc8
+
+    concurrency:
+      group: syntax-atlas-production
+      cancel-in-progress: false
+
+    steps:
+      - name: 取得程式碼
+        uses: actions/checkout@v6
+
+      - name: 確認仍是 master 最新版本
+        id: version
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          latest_sha="$(git ls-remote origin refs/heads/master | cut -f1)"
+          test -n "$latest_sha"
+
+          if [[ "$latest_sha" == "$RELEASE_SHA" ]]; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "已有較新的提交，略過這個版本的部署"
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 取得 AWS 短效憑證
+        if: steps.version.outputs.deploy == 'true'
+        uses: aws-actions/configure-aws-credentials@v6.3.0
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: syntax-atlas-${{ github.run_id }}
+
+      - name: 暫時允許當次 runner 連線 SSH
+        if: steps.version.outputs.deploy == 'true'
+        id: ssh_access
+        run: |
+          set -Eeuo pipefail
+
+          runner_ip="$(curl --ipv4 --fail --silent --show-error \
+            --retry 3 --max-time 15 https://checkip.amazonaws.com)"
+
+          python3 -c \
+            'import ipaddress, sys; ipaddress.IPv4Address(sys.argv[1])' \
+            "$runner_ip"
+
+          rule_id="$(aws ec2 authorize-security-group-ingress \
+            --group-id "$EC2_SECURITY_GROUP_ID" \
+            --ip-permissions \
+              "IpProtocol=tcp,FromPort=22,ToPort=22,IpRanges=[{CidrIp=${runner_ip}/32,Description=github-actions-${GITHUB_RUN_ID}}]" \
+            --query 'SecurityGroupRules[0].SecurityGroupRuleId' \
+            --output text)"
+
+          echo "rule_id=$rule_id" >> "$GITHUB_OUTPUT"
+          echo "已新增當次部署的 SSH 規則：$rule_id"
+
+          sleep 5
+
+      - name: 傳送並執行部署腳本
+        if: steps.version.outputs.deploy == 'true'
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          set -Eeuo pipefail
+          umask 077
+
+          ssh_dir="$(mktemp -d "$RUNNER_TEMP/deploy-ssh.XXXXXX")"
+          trap 'rm -rf -- "$ssh_dir"' EXIT
+
+          printf '%s\n' "$EC2_SSH_KEY" |
+            tr -d '\r' > "$ssh_dir/key"
+
+          printf '%s\n' "$EC2_KNOWN_HOSTS" |
+            tr -d '\r' > "$ssh_dir/known_hosts"
+
+          chmod 600 "$ssh_dir/key" "$ssh_dir/known_hosts"
+
+          # 確認私鑰格式與主機公鑰設定。
+          ssh-keygen -y -f "$ssh_dir/key" > /dev/null
+          ssh-keygen -F "$EC2_HOST" \
+            -f "$ssh_dir/known_hosts" > /dev/null
+
+          ssh_options=(
+            -i "$ssh_dir/key"
+            -o IdentitiesOnly=yes
+            -o BatchMode=yes
+            -o StrictHostKeyChecking=yes
+            -o "UserKnownHostsFile=$ssh_dir/known_hosts"
+            -o ConnectTimeout=15
+            -o ServerAliveInterval=30
+            -o ServerAliveCountMax=4
+          )
+
+          remote_dir="syntax-atlas/releases/$RELEASE_SHA"
+          target="$EC2_USER@$EC2_HOST"
+
+
+          connected=false
+
+          for attempt in {1..6}; do
+            echo "測試 SSH 連線，第 $attempt 次"
+
+            if ssh "${ssh_options[@]}" "$target" "true"; then
+              connected=true
+              break
+            fi
+
+            sleep 10
+          done
+
+          if [[ "$connected" != true ]]; then
+            echo "SSH 重試後仍無法連線，停止部署"
+            exit 1
+          fi
+
+
+          ssh "${ssh_options[@]}" "$target" \
+            "umask 077; mkdir -p '$remote_dir'"
+
+          scp "${ssh_options[@]}" \
+            deploy/deploy.sh compose.release.yaml \
+            "${target}:${remote_dir}/"
+
+          ssh "${ssh_options[@]}" "$target" \
+            "bash '$remote_dir/deploy.sh' '$RELEASE_SHA'"
+
+      - name: 移除當次部署的 SSH 規則
+        if: ${{ always() && steps.ssh_access.outputs.rule_id != '' }}
+        env:
+          SSH_RULE_ID: ${{ steps.ssh_access.outputs.rule_id }}
+        run: |
+          aws ec2 revoke-security-group-ingress \
+            --group-id "$EC2_SECURITY_GROUP_ID" \
+            --security-group-rule-ids "$SSH_RULE_ID"
+
+          echo "已移除 SSH 規則：$SSH_RULE_ID"
