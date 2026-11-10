@@ -1,0 +1,86 @@
+name: Syntax Atlas CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# 同一個分支有新提交時，取消上一輪尚未完成的檢查
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: 後端檢查與 Docker 建置
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: 取得程式碼
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: 檢查 Python 語法
+        run: |
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+
+          for path in sorted(Path("backend").rglob("*.py")):
+              ast.parse(
+                  path.read_text(encoding="utf-8-sig"),
+                  filename=str(path),
+              )
+              print(f"通過：{path}")
+          PY
+
+      - name: 建置後端 Docker 映像
+        run: docker build --tag syntax-atlas-backend:ci ./backend
+
+      - name: 確認映像可載入 API
+        run: |
+          docker run --rm syntax-atlas-backend:ci \
+            python -c "from main import app; print('API 載入成功，路由數：', len(app.routes))"
+
+  frontend:
+    name: 前端檢查與 Docker 建置
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: 取得程式碼
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: 設定 Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      - name: 安裝前端套件
+        working-directory: frontend
+        run: npm ci
+
+      - name: 檢查 ESLint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: 檢查 TypeScript 型別
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+      - name: 建置前端 Docker 映像
+        run: |
+          docker build \
+            --build-arg API_INTERNAL_URL=http://backend:8000 \
+            --tag syntax-atlas-frontend:ci \
+            ./frontend
