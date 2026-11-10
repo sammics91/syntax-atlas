@@ -15,3 +15,10 @@ fetch_python_chapters.py
 *.pem
 *.sql
 *.tar
+
+# 允許 Docker 複製資料庫更新檔
+!database/
+!database/*_schema.sql
+!database/migrations/
+!database/migrations/*.sql
+!database/migrations/*.py
