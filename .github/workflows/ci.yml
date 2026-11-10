@@ -84,3 +84,72 @@ jobs:
             --build-arg API_INTERNAL_URL=http://backend:8000 \
             --tag syntax-atlas-frontend:ci \
             ./frontend
+
+  publish:
+  name: 發布 Docker 映像至 GHCR
+  needs: [backend, frontend]
+  if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+
+  runs-on: ubuntu-latest
+  timeout-minutes: 30
+
+  permissions:
+    contents: read
+    packages: write
+
+  env:
+    BACKEND_IMAGE: ghcr.io/sammics91/syntax-atlas-backend
+    FRONTEND_IMAGE: ghcr.io/sammics91/syntax-atlas-frontend
+    IMAGE_TAG: ${{ github.sha }}
+
+  steps:
+    - name: 取得程式碼
+      uses: actions/checkout@v6
+      with:
+        persist-credentials: false
+
+    - name: 登入 GHCR
+      env:
+        GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GHCR_USER: ${{ github.actor }}
+      run: |
+        printf '%s' "$GHCR_TOKEN" |
+          docker login ghcr.io \
+            --username "$GHCR_USER" \
+            --password-stdin
+
+    - name: 建置後端發布映像
+      run: |
+        docker build \
+          --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+          --label "org.opencontainers.image.revision=$IMAGE_TAG" \
+          --tag "$BACKEND_IMAGE:$IMAGE_TAG" \
+          ./backend
+
+    - name: 確認後端發布映像可載入 API
+      run: |
+        docker run --rm "$BACKEND_IMAGE:$IMAGE_TAG" \
+          python -c "from main import app; print('API 載入成功，路由數：', len(app.routes))"
+
+    - name: 建置前端發布映像
+      run: |
+        docker build \
+          --build-arg API_INTERNAL_URL=http://backend:8000 \
+          --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+          --label "org.opencontainers.image.revision=$IMAGE_TAG" \
+          --tag "$FRONTEND_IMAGE:$IMAGE_TAG" \
+          ./frontend
+
+    - name: 上傳前後端映像
+      run: |
+        docker push "$BACKEND_IMAGE:$IMAGE_TAG"
+        docker push "$FRONTEND_IMAGE:$IMAGE_TAG"
+
+    - name: 記錄發布版本
+      run: |
+        {
+          echo "## Docker 映像發布完成"
+          echo
+          echo "- Backend: \`$BACKEND_IMAGE:$IMAGE_TAG\`"
+          echo "- Frontend: \`$FRONTEND_IMAGE:$IMAGE_TAG\`"
+        } >> "$GITHUB_STEP_SUMMARY"
