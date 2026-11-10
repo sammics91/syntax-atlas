@@ -2,6 +2,7 @@
 
 // React
 import {
+  Suspense,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -12,10 +13,12 @@ import {
 // Next.js
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 // 自訂元件與型別
 import AuthDialog from "./AuthDialog";
+import ProfileDialog from "./ProfileDialog";
+import ResetPasswordDialog from "./ResetPasswordDialog";
 import { useAuth } from "./AuthProvider";
 
 const navigation = [
@@ -26,8 +29,28 @@ const navigation = [
 ];
 
 export default function SiteShell({ children }: { children: ReactNode }) {
+  return (
+    <Suspense fallback={<p role="status">正在載入網站…</p>}>
+      <SiteShellContent>{children}</SiteShellContent>
+    </Suspense>
+  );
+}
+
+function SiteShellContent({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+
+  const searchParams = useSearchParams();
+
+  const passwordReset = searchParams.get("password-reset") === "success";
+
+  const passwordUpdated = searchParams.get("password-updated") === "success";
+
+  const passwordNotice = passwordUpdated
+    ? "密碼已更新，請使用新密碼重新登入。"
+    : passwordReset
+      ? "密碼已重設，請使用新密碼重新登入。"
+      : "";
 
   // 從 AuthProvider 取得共用會員狀態
   const {
@@ -41,6 +64,15 @@ export default function SiteShell({ children }: { children: ReactNode }) {
 
   // 登入視窗控制
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+
+  // 會員資訊視窗控制
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  // 登入視窗額外顯示的提示
+  const [authNotice, setAuthNotice] = useState("");
+
+  // 郵件中的重設憑證
+  const [resetToken, setResetToken] = useState<string | null>(null);
 
   // 避免同一次進入重複跳出警告
   const warnedPath = useRef<string | null>(null);
@@ -109,6 +141,51 @@ export default function SiteShell({ children }: { children: ReactNode }) {
     setIsAuthOpen(true);
   }, [requiresLogin, user, isAuthLoading, authError, pathname, router]);
 
+  // 從郵件開啟首頁時，讀取憑證並顯示重設視窗
+  useEffect(() => {
+    function readResetToken() {
+      if (window.location.pathname !== "/") {
+        setResetToken(null);
+        return;
+      }
+
+      const fragment = new URLSearchParams(window.location.hash.slice(1));
+
+      if (!fragment.has("reset_token")) {
+        setResetToken(null);
+        return;
+      }
+
+      setIsAuthOpen(false);
+      setAuthNotice("");
+      setResetToken(fragment.get("reset_token") ?? "");
+    }
+
+    readResetToken();
+    window.addEventListener("hashchange", readResetToken);
+
+    return () => {
+      window.removeEventListener("hashchange", readResetToken);
+    };
+  }, [pathname]);
+
+  // 關閉視窗時，一併移除網址上的重設憑證
+  function handleCloseResetPassword() {
+    const url = new URL(window.location.href);
+    const fragment = new URLSearchParams(url.hash.slice(1));
+
+    fragment.delete("reset_token");
+    url.hash = fragment.toString();
+
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${url.pathname}${url.search}${url.hash}`,
+    );
+
+    setResetToken(null);
+  }
+
   return (
     <div className="site-shell">
       <header className="site-header">
@@ -123,33 +200,43 @@ export default function SiteShell({ children }: { children: ReactNode }) {
           </div>
 
           <div className="site-account">
-            <span
-              className={`account-name${authError ? " account-name-error" : ""}`}
-              title={authError || undefined}
-            >
-              {isAuthLoading
-                ? "確認中…"
-                : user
-                  ? user.name
-                  : authError
-                    ? "狀態未確認"
-                    : "訪客"}
-            </span>
+            {user ? (
+              <button
+                type="button"
+                className="account-name account-profile-button"
+                onClick={() => setIsProfileOpen(true)}
+                disabled={isSigningOut}
+                aria-haspopup="dialog"
+              >
+                {user.name}
+              </button>
+            ) : (
+              <span
+                className={`account-name${authError ? " account-name-error" : ""}`}
+                title={authError || undefined}
+              >
+                {isAuthLoading ? "確認中…" : authError ? "狀態未確認" : "訪客"}
+              </span>
+            )}
 
             {user ? (
               <button
                 type="button"
                 className="login-button"
-                onClick={signout}
                 disabled={isSigningOut}
+                onClick={() => {
+                  if (window.matchMedia("(max-width: 440px)").matches) {
+                    setIsProfileOpen(true);
+                  } else {
+                    void signout();
+                  }
+                }}
               >
                 <span className="account-label-desktop">
                   {isSigningOut ? "登出中…" : "登出"}
                 </span>
 
-                <span className="account-label-mobile">
-                  {isSigningOut ? "登出中…" : `${user.name} · 登出`}
-                </span>
+                <span className="account-label-mobile">{user.name}</span>
               </button>
             ) : (
               <button
@@ -165,9 +252,25 @@ export default function SiteShell({ children }: { children: ReactNode }) {
           </div>
         </div>
 
-        {isAuthOpen && (
+        {(isAuthOpen || Boolean(passwordNotice)) && resetToken === null && (
           <AuthDialog
-            onClose={() => setIsAuthOpen(false)}
+            key={passwordNotice || "normal"}
+            notice={passwordNotice || authNotice}
+            onClose={() => {
+              setIsAuthOpen(false);
+              setAuthNotice("");
+
+              if (passwordNotice) {
+                const url = new URL(window.location.href);
+
+                url.searchParams.delete("password-reset");
+                url.searchParams.delete("password-updated");
+
+                router.replace(`${url.pathname}${url.search}${url.hash}`, {
+                  scroll: false,
+                });
+              }
+            }}
             onSignedIn={completeSignin}
           />
         )}
@@ -226,6 +329,28 @@ export default function SiteShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       </footer>
+
+      {user && isProfileOpen && resetToken === null && (
+        <ProfileDialog
+          open={isProfileOpen}
+          onClose={() => setIsProfileOpen(false)}
+          onUserUpdated={completeSignin}
+          onPasswordChanged={() => {
+            window.location.replace("/?password-updated=success");
+          }}
+          onAccountDeleted={() => {
+            window.location.replace("/");
+          }}
+        />
+      )}
+
+      {resetToken !== null && (
+        <ResetPasswordDialog
+          key={resetToken}
+          token={resetToken}
+          onClose={handleCloseResetPassword}
+        />
+      )}
     </div>
   );
 }

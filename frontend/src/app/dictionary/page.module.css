@@ -1,3 +1,91 @@
+/*-- 搜尋欄 --*/
+.search {
+  width: 100%;
+  max-width: 620px;
+  margin: 24px 9px 0;
+}
+
+.searchRow {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  min-height: 45px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.searchRow:focus-within {
+  outline: 2px solid var(--chart-gray);
+  outline-offset: 3px;
+}
+
+.searchRow input {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 5px 0 0 5px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+}
+
+.searchRow input:focus {
+  outline: none;
+}
+
+.clearSearch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  flex-shrink: 0;
+  gap: 4px;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--primary);
+  font: inherit;
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.clearSearch:hover {
+  background: var(--soft-bg);
+}
+
+.submitSearch {
+  flex-shrink: 0;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 0 5px 5px 0;
+  background: var(--primary);
+  color: var(--surface);
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.search button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -4px;
+}
+
+.search .submitSearch:focus-visible {
+  outline-color: var(--surface);
+}
+
+.search button:disabled,
+.search input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /*-- 載入、錯誤與空清單提示 --*/
 .message,
 .error {
@@ -13,19 +101,75 @@
   color: var(--error);
 }
 
+.noResults {
+  margin: 12px 0 0;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
 /*-- 語言標題 --*/
 .dictionary {
   margin-top: 30px;
 }
 
+/* 語言標題與收藏篩選 */
+.summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 32px;
+  margin-bottom: 8px;
+}
+
 .languageTitle {
   display: table;
-  margin: 0 0 8px;
+  margin: 0;
   padding: 0 12px 10px;
   border-bottom: 2px solid var(--primary);
   color: var(--primary);
   font-size: 16px;
   font-weight: 700;
+}
+
+/* 僅顯示我的收藏 */
+.bookmarkFilter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.bookmarkFilter:hover:not(:disabled),
+.bookmarkFilterActive {
+  color: var(--primary);
+  background: var(--soft-bg);
+}
+
+.bookmarkFilter:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.bookmarkFilter:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* 收藏清單為空：與語法列表相同寬度的白底 */
+.emptyBookmarks {
+  margin: 0;
+  padding: 20px;
+  color: var(--text-muted);
+  background: var(--surface);
+  border-radius: 6px;
+  line-height: 1.6;
 }
 
 /*-- 語法列表與滑過效果 --*/
@@ -52,13 +196,55 @@
   box-shadow: 0 6px 16px rgb(0 0 0 / 10%);
 }
 
+/* 收藏按鈕與語法標題並排 */
+.headingRow {
+  display: flex;
+  align-items: stretch;
+}
+
+/* 收藏圖示 */
+.bookmarkButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  margin-left: 10px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.bookmarkButton:focus-visible {
+  outline: 2px solid var(--chart-gray);
+  outline-offset: -2px;
+}
+
+/* 滑鼠移入與已收藏都使用亮金色 */
+.bookmarkButton:hover:not(:disabled),
+.bookmarkButton.bookmarked {
+  color: var(--accent-light);
+}
+
+.bookmarkButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .row {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex: 1;
   gap: 16px;
   width: 100%;
-  padding: 15px 22px;
+  min-width: 0;
+  padding: 15px 22px 15px 6px;
   border: none;
   border-radius: 4px;
   background: transparent;
@@ -72,6 +258,40 @@
   flex-shrink: 0;
 }
 
+.name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* 中文名稱預留空間，顯示時不推動右側使用狀態 */
+.displayLabel {
+  opacity: 0;
+}
+
+.row:hover .displayLabel,
+.row:focus-visible .displayLabel,
+.expanded .displayLabel {
+  opacity: 1;
+}
+
+.usedName {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.usage {
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+/* 未展開時，滑過整列才加深已使用次數的文字 */
+.item:not(.expanded):hover .usedUsage {
+  color: var(--text);
+}
+
 .row:focus-visible {
   outline: 2px solid var(--chart-gray);
   outline-offset: -3px;
@@ -82,6 +302,26 @@
   background: var(--primary);
   color: var(--surface);
   font-weight: 700;
+}
+
+/* 展開後，收藏圖示與名稱一起左移 */
+.expanded .bookmarkButton svg,
+.expanded .name {
+  transform: translateX(-8.5px);
+}
+
+/* 展開後，收藏按鈕所在區域也使用綠底 */
+.expanded .headingRow {
+  background: var(--primary);
+}
+
+.expanded .bookmarkButton:not(.bookmarked):not(:hover) {
+  color: var(--surface);
+}
+
+.expanded .usedName,
+.expanded .usedUsage {
+  color: var(--surface);
 }
 
 .details {
@@ -114,7 +354,16 @@
 /*-- 手機版 --*/
 @media (max-width: 640px) {
   .row {
-    padding: 14px;
+    padding: 14px 14px 14px 4px;
+  }
+
+  .bookmarkButton {
+    margin-left: 4px;
+  }
+
+  .expanded .bookmarkButton svg,
+  .expanded .name {
+    transform: translateX(-10.5px);
   }
 
   .details {

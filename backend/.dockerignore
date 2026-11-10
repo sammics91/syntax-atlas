@@ -9,6 +9,7 @@ __pycache__/
 data/
 database/
 import_*.py
+scripts/initial_syntax_import/
 fetch_python_chapters.py
 
 *.pem

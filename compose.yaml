@@ -2,7 +2,7 @@ name: syntax-atlas
 
 services:
   backend:
-    image: syntax-atlas-backend:v1.0.0
+    image: syntax-atlas-backend:dev
 
     build:
       context: ./backend
@@ -17,7 +17,7 @@ services:
     restart: unless-stopped
 
   frontend:
-    image: syntax-atlas-frontend:v1.0.0
+    image: syntax-atlas-frontend:dev
 
     build:
       context: ./frontend

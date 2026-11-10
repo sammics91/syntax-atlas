@@ -5,7 +5,9 @@ from pydantic import BaseModel, Field
 
 from analyzer import analyze_python
 from auth import router as auth_router
+from bookmarks import router as bookmarks_router
 from database import get_db_connection
+from password_reset import router as password_reset_router
 from records import router as records_router
 from syntax_statistics import router as statistics_router
 
@@ -15,6 +17,8 @@ app = FastAPI()
 
 # 掛載 API
 app.include_router(auth_router)
+app.include_router(bookmarks_router)
+app.include_router(password_reset_router)
 app.include_router(records_router)
 app.include_router(statistics_router)
 
@@ -87,7 +91,10 @@ def get_syntaxes():
                     s.id,
                     s.slug,
                     s.name,
+                    s.display_label,
+                    c.name AS category_name,
                     COALESCE(s.summary, '') AS summary,
+                    COALESCE(s.example_description, '') AS example_description,
                     COALESCE(s.example_code, '') AS example_code
                 FROM syntaxes AS s
                 JOIN syntax_categories AS c

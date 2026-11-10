@@ -1,6 +1,11 @@
 import json
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
+
+# 固定使用 backend 內的連線工具與資料檔，不受執行位置影響
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(BACKEND_DIR))
 
 from database import get_db_connection
 
@@ -8,7 +13,7 @@ from database import get_db_connection
 def main():
     # 讀取已抓取的官方文件
     json_path = (
-        Path(__file__).resolve().parent
+        BACKEND_DIR
         / "data"
         / "python-3.13"
         / "all-sections.json"

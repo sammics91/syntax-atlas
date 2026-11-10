@@ -21,6 +21,7 @@ type StatisticsResult = {
 
 export default function StatisticsPage() {
   const { user } = useAuth();
+  const userId = user?.id;
 
   const [statistics, setStatistics] = useState<StatisticsResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -28,7 +29,7 @@ export default function StatisticsPage() {
 
   // 取得目前會員累積的語法使用次數
   useEffect(() => {
-    if (!user) return;
+    if (userId === undefined) return;
 
     const controller = new AbortController();
 
@@ -82,7 +83,7 @@ export default function StatisticsPage() {
     void loadStatistics();
 
     return () => controller.abort();
-  }, [user?.id]);
+  }, [userId]);
 
   const usages = statistics?.usages ?? [];
   const maxCount = usages[0]?.count ?? 0;

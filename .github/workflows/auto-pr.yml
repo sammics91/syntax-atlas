@@ -1,0 +1,84 @@
+name: Develop 自動 PR 與合併
+
+on:
+  push:
+    branches: [develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: develop-auto-pr
+  cancel-in-progress: false
+
+jobs:
+  auto-pr:
+    name: 建立 PR 並啟用自動合併
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    env:
+      GH_TOKEN: ${{ secrets.PR_AUTOMATION_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      EXPECTED_SHA: ${{ github.sha }}
+
+    steps:
+      - name: 確認憑證已設定
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "請先設定 PR_AUTOMATION_TOKEN"
+            exit 1
+          fi
+
+      - name: 建立或沿用 PR
+        id: pr
+        run: |
+          set -euo pipefail
+
+          current_sha="$(gh api \
+            "repos/$GH_REPO/git/ref/heads/develop" \
+            --jq '.object.sha')"
+
+          if [ "$current_sha" != "$EXPECTED_SHA" ]; then
+            echo "develop 已有較新的提交，略過這次操作。"
+            exit 0
+          fi
+
+          pr_number="$(gh pr list \
+            --repo "$GH_REPO" \
+            --base master \
+            --head develop \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')"
+
+          if [ -z "$pr_number" ]; then
+            pr_url="$(gh pr create \
+              --repo "$GH_REPO" \
+              --base master \
+              --head develop \
+              --title "更新網站功能與建置設定" \
+              --body "此 PR 由 develop 更新自動建立；必要 CI 通過後自動合併。")"
+
+            pr_number="$(gh pr view "$pr_url" \
+              --repo "$GH_REPO" \
+              --json number \
+              --jq '.number')"
+
+            echo "已建立 PR #$pr_number"
+          else
+            echo "沿用既有 PR #$pr_number，保留原本標題與說明。"
+          fi
+
+          echo "number=$pr_number" >> "$GITHUB_OUTPUT"
+
+      - name: 啟用自動合併
+        if: steps.pr.outputs.number != ''
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          gh pr merge "$PR_NUMBER" \
+            --repo "$GH_REPO" \
+            --auto \
+            --merge \
+            --match-head-commit "$EXPECTED_SHA"

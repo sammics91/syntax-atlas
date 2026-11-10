@@ -133,6 +133,24 @@ textarea::placeholder {
   color: var(--error);
 }
 
+/* 會員名稱：點擊開啟會員資訊 */
+.account-profile-button {
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.account-profile-button:hover:not(:disabled) {
+  color: var(--accent);
+}
+
+.account-profile-button:disabled {
+  cursor: default;
+}
+
 .login-button {
   flex-shrink: 0;
   padding: 9px 16px 7px;
