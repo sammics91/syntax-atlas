@@ -1,3 +1,6 @@
+import ast
+import re
+from collections import Counter
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException
@@ -29,7 +32,7 @@ app.include_router(statistics_router)
 
 # 分析請求的資料格式，目前先支援 Python / HTML
 class AnalysisRequest(BaseModel):
-    language: Literal["python", "html"]
+    language: Literal["python", "html"] | None = None
     code: str = Field(min_length=1, max_length=20000)
 
     # 僅供 HTML 使用；預設分析一般內容片段。
@@ -45,6 +48,58 @@ ANALYZERS = {
     "html": analyze_html,
 }
 
+# 未指定語言時，先判斷程式碼適合交給哪個分析器。
+def detect_language(code: str) -> str:
+    # 能完整解析成 Python，就交給 Python 分析器。
+    # Python 字串裡即使出現 HTML，也不另外拆開分析。
+    try:
+        ast.parse(code)
+    except SyntaxError:
+        pass
+    else:
+        return "python"
+
+    # 開頭具有 HTML 標籤、註解或文件宣告時，
+    # 交給 HTML 分析器進一步驗證，並非直接認定語法正確。
+    if re.match(
+        r"\s*(?:<!--|<!doctype\b|</?[a-z][a-z0-9:-]*(?=[\s/>]))",
+        code,
+        flags=re.IGNORECASE,
+    ):
+        return "html"
+
+    raise HTTPException(
+        status_code=400,
+        detail="無法自動辨識程式語言，請選擇語言後再試。",
+    )
+
+# 計算本次分析中各語言的語法使用次數與占比
+def build_language_stats(syntaxes):
+    # 加總語法出現次數，不是語法種類數。
+    usage_counts = Counter()
+
+    for syntax in syntaxes:
+        usage_counts[syntax["language"]] += syntax["count"]
+
+    total_usage_count = sum(usage_counts.values())
+
+    language_stats = [
+        {
+            "language": language,
+            "usage_count": count,
+            "percentage": round(
+                count / total_usage_count * 100,
+                1,
+            ),
+        }
+        for language, count in sorted(
+            usage_counts.items(),
+            key=lambda item: (-item[1], item[0]),
+        )
+        if count > 0
+    ]
+
+    return language_stats, total_usage_count
 
 # POST /api/analyses：分析程式碼
 @app.post("/api/analyses")
@@ -61,10 +116,11 @@ def create_analysis(request: AnalysisRequest):
             detail="程式碼不能包含空字元。",
         )
 
-    analyzer = ANALYZERS[request.language]
+    language = request.language or detect_language(request.code)
+    analyzer = ANALYZERS[language]
 
     try:
-        if request.language == "html":
+        if language == "html":
             syntaxes = analyzer(
                 request.code,
                 mode=request.html_mode,
@@ -77,7 +133,7 @@ def create_analysis(request: AnalysisRequest):
     # 必須放在一般 SyntaxError 前面，才能保留全部錯誤。
     except HTMLValidationError as error:
         return {
-            "language": request.language,
+            "language": language,
             "valid": False,
             "syntaxes": [],
             "errors": error.errors,
@@ -85,7 +141,7 @@ def create_analysis(request: AnalysisRequest):
 
     except SyntaxError as error:
         return {
-            "language": request.language,
+            "language": language,
             "valid": False,
             "syntaxes": [],
             "errors": [
@@ -104,10 +160,14 @@ def create_analysis(request: AnalysisRequest):
             detail=str(error),
         ) from error
 
+    language_stats, total_usage_count = build_language_stats(syntaxes)
+
     return {
-        "language": request.language,
+        "language": language,
         "valid": True,
         "syntaxes": syntaxes,
+        "language_stats": language_stats,
+        "total_usage_count": total_usage_count,
         "errors": [],
     }
 

@@ -71,6 +71,87 @@ def count_html_tags(code: str) -> dict[str, int]:
     return dict(parser.tag_counts)
 
 
+# 取出 HTML 中實際寫出的 CSS 與 JavaScript 區塊。
+class HTMLEmbeddedCodeParser(HTMLParser):
+    # 避免把這些元素內的文字誤認為 HTML 標籤。
+    CDATA_CONTENT_ELEMENTS = HTMLSyntaxParser.CDATA_CONTENT_ELEMENTS
+
+    def __init__(self):
+        super().__init__(convert_charrefs=False)
+        self.blocks = []
+        self.current_block = None
+
+    def handle_starttag(self, tag, attrs):
+        if tag not in {"style", "script"}:
+            return
+
+        attributes = dict(attrs)
+        content_type = (attributes.get("type") or "").strip().lower()
+
+        if tag == "style":
+            # 目前只處理一般 CSS，不處理其他樣式語言。
+            if content_type not in {"", "text/css"}:
+                return
+
+            language = "css"
+
+        else:
+            # 外部檔案不會自動下載，也不計算其內容。
+            if "src" in attributes:
+                return
+
+            # JSON 等資料區塊不當成 JavaScript。
+            if content_type not in {
+                "",
+                "module",
+                "text/javascript",
+                "application/javascript",
+                "text/ecmascript",
+                "application/ecmascript",
+            }:
+                return
+
+            language = "javascript"
+
+        self.current_block = {
+            "tag": tag,
+            "language": language,
+            "parts": [],
+        }
+
+    def handle_data(self, data):
+        if self.current_block is not None:
+            self.current_block["parts"].append(data)
+
+    def handle_endtag(self, tag):
+        if self.current_block is None:
+            return
+
+        if tag != self.current_block["tag"]:
+            return
+
+        code = "".join(self.current_block["parts"])
+
+        if code.strip():
+            self.blocks.append(
+                {
+                    "language": self.current_block["language"],
+                    "code": code,
+                }
+            )
+
+        self.current_block = None
+
+
+def extract_embedded_code(code: str) -> list[dict]:
+    """拆出內嵌程式碼；HTML 是否正確仍由既有驗證器負責。"""
+    parser = HTMLEmbeddedCodeParser()
+    parser.feed(code)
+    parser.close()
+
+    return parser.blocks
+
+
 def validate_html(
     code: str,
     *,
@@ -322,6 +403,7 @@ def analyze_html(
     return [
         {
             "syntax_id": syntax_id,
+            "language": "html",
             "slug": syntax_details[syntax_id]["slug"],
             "name": syntax_details[syntax_id]["name"],
             "display_label": syntax_details[syntax_id]["display_label"],
