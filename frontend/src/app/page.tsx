@@ -200,7 +200,6 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          language: "python",
           code,
         }),
       });
@@ -239,8 +238,7 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
         const firstError = analysis.errors[0];
         const location = firstError?.line ? `第 ${firstError.line} 行：` : "";
 
-        const languageName =
-          analysis.language === "python" ? "Python" : analysis.language;
+        const languageName = analysis.language === "python" ? "Python" : "HTML";
 
         setError(
           `無法以 ${languageName} 語法解析。${location}${
@@ -427,7 +425,7 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
             id="code-content"
             name="code"
             aria-label="程式碼內容"
-            placeholder="在這裡貼上你的 Python 程式碼"
+            placeholder="在這裡貼上你的 Python 或 HTML 程式碼"
             spellCheck={false}
             autoCapitalize="off"
             autoCorrect="off"
@@ -503,12 +501,16 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
               本次辨識到的語法
             </h2>
 
-            <span>共 {result.syntaxes.length} 種</span>
+            <span>
+              {result.language === "python" ? "Python" : "HTML"}
+              {" · 共 "}
+              {result.syntaxes.length} 種
+            </span>
           </div>
 
           {result.syntaxes.length === 0 ? (
             <p className={styles.resultNote}>
-              程式碼符合所選語言的語法，但未辨識到目前支援的語法項目。
+              程式碼通過語法檢查，但未辨識到目前支援的語法項目。
             </p>
           ) : (
             <ul className={styles.syntaxList}>
