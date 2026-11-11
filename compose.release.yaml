@@ -5,6 +5,12 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY:?請設定 Resend API Key}
       MAIL_FROM: ${MAIL_FROM:?請設定寄件人}
       PUBLIC_APP_URL: ${PUBLIC_APP_URL:?請設定正式網站網址}
+      HTML_VALIDATOR_URL: http://html-validator:8888/
 
   frontend:
     image: ghcr.io/sammics91/syntax-atlas-frontend:${RELEASE_SHA:?請設定發布版本}
+
+  html-validator:
+    image: ghcr.io/validator/validator@sha256:292cef9f3367a6d52447c617e65c94bca04cd3399abb37bd5d17c1c7d430525a
+
+    restart: unless-stopped
