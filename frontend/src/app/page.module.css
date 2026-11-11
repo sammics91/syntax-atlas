@@ -103,6 +103,41 @@
   color: var(--primary);
 }
 
+/* 編輯狀態與取消編輯 */
+.editNotice {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.cancelEdit {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.cancelEdit:not(:disabled):hover {
+  color: var(--accent);
+}
+
+.cancelEdit:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.cancelEdit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .analyzeButton {
   flex-shrink: 0;
   padding: 10px 20px;

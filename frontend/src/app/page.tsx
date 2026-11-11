@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import AuthDialog from "@/components/AuthDialog";
 import { useAuth } from "@/components/AuthProvider";
@@ -54,6 +54,7 @@ function HomePageRoute() {
 }
 
 function HomeEditor({ recordId }: { recordId: string | null }) {
+  const router = useRouter();
   const [title, setTitle] = useState("");
   const [code, setCode] = useState("");
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -126,7 +127,7 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
           String(data.id) !== recordId ||
           typeof data.record_number !== "number" ||
           typeof data.code !== "string" ||
-          data.language !== "python"
+          (data.language !== "python" && data.language !== "html")
         ) {
           throw new Error("紀錄內容格式異常，無法開啟編輯。");
         }
@@ -346,6 +347,18 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
     void handleSave();
   }
 
+  // 離開編輯模式，清空畫面並回到新增程式碼。
+  function handleCancelEdit() {
+    if (isAnalyzing || isSaving || savingRef.current) return;
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete("record");
+
+    router.replace(`${url.pathname}${url.search}${url.hash}`, {
+      scroll: false,
+    });
+  }
+
   if (recordId !== null && !isEditorReady) {
     return (
       <>
@@ -453,7 +466,26 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
               目前輸入 {code.length} 個字元
             </p>
 
-            {savedRecordNumber !== null ? (
+            {editingRecord ? (
+              <p className={styles.editNotice}>
+                <span role="status">
+                  {savedRecordNumber !== null
+                    ? `紀錄 #${editingRecord.record_number} 已儲存`
+                    : `正在編輯紀錄 #${editingRecord.record_number}`}
+                </span>
+
+                <span aria-hidden="true">．</span>
+
+                <button
+                  type="button"
+                  className={styles.cancelEdit}
+                  onClick={handleCancelEdit}
+                  disabled={isAnalyzing || isSaving}
+                >
+                  {savedRecordNumber !== null ? "結束編輯" : "取消編輯"}
+                </button>
+              </p>
+            ) : savedRecordNumber !== null ? (
               <p className={styles.saveMessage} role="status">
                 程式碼已儲存，紀錄編號 #{savedRecordNumber}。
               </p>
