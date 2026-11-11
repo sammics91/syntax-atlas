@@ -213,7 +213,7 @@ export default function DictionaryPage() {
 
     async function loadUsage() {
       try {
-        const response = await fetch("/api/statistics", {
+        const response = await fetch("/api/statistics?language=all", {
           credentials: "include",
           cache: "no-store",
           signal: controller.signal,
