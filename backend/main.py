@@ -4,6 +4,11 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from analyzer import analyze_python
+from analyzer_html import (
+    HTMLValidationError,
+    HTMLValidationServiceError,
+    analyze_html,
+)
 from auth import router as auth_router
 from bookmarks import router as bookmarks_router
 from database import get_db_connection
@@ -22,15 +27,22 @@ app.include_router(password_reset_router)
 app.include_router(records_router)
 app.include_router(statistics_router)
 
-# 分析請求的資料格式，目前先支援 Python
+# 分析請求的資料格式，目前先支援 Python / HTML
 class AnalysisRequest(BaseModel):
-    language: Literal["python"]
+    language: Literal["python", "html"]
     code: str = Field(min_length=1, max_length=20000)
+
+    # 僅供 HTML 使用；預設分析一般內容片段。
+    html_mode: Literal["document", "fragment"] = "fragment"
+    html_context: Literal[
+        "div", "ul", "ol", "table", "tbody", "tr", "select"
+    ] = "div"
 
 
 # 依程式語言選擇分析器
 ANALYZERS = {
     "python": analyze_python,
+    "html": analyze_html,
 }
 
 
@@ -52,7 +64,24 @@ def create_analysis(request: AnalysisRequest):
     analyzer = ANALYZERS[request.language]
 
     try:
-        syntaxes = analyzer(request.code)
+        if request.language == "html":
+            syntaxes = analyzer(
+                request.code,
+                mode=request.html_mode,
+                context=request.html_context,
+            )
+        else:
+            syntaxes = analyzer(request.code)
+
+    # HTMLValidationError 繼承 SyntaxError，
+    # 必須放在一般 SyntaxError 前面，才能保留全部錯誤。
+    except HTMLValidationError as error:
+        return {
+            "language": request.language,
+            "valid": False,
+            "syntaxes": [],
+            "errors": error.errors,
+        }
 
     except SyntaxError as error:
         return {
@@ -68,6 +97,13 @@ def create_analysis(request: AnalysisRequest):
             ],
         }
 
+    # 驗證器無法連線屬於服務問題，不當成使用者的語法錯誤。
+    except HTMLValidationServiceError as error:
+        raise HTTPException(
+            status_code=503,
+            detail=str(error),
+        ) from error
+
     return {
         "language": request.language,
         "valid": True,
@@ -78,7 +114,9 @@ def create_analysis(request: AnalysisRequest):
 
 # GET /api/syntaxes：取得語法辭典
 @app.get("/api/syntaxes")
-def get_syntaxes():
+def get_syntaxes(
+    language: Literal["python", "html"] | None = None,
+):
     connection = get_db_connection()
 
     try:
@@ -92,6 +130,7 @@ def get_syntaxes():
                     s.slug,
                     s.name,
                     s.display_label,
+                    c.language,
                     c.name AS category_name,
                     COALESCE(s.summary, '') AS summary,
                     COALESCE(s.example_description, '') AS example_description,
@@ -99,11 +138,11 @@ def get_syntaxes():
                 FROM syntaxes AS s
                 JOIN syntax_categories AS c
                     ON s.category_id = c.id
-                WHERE c.language = %s
-                  AND s.is_active = TRUE
+                WHERE (%s IS NULL OR c.language = %s)
+                AND s.is_active = TRUE
                 ORDER BY s.sort_key, s.id
                 """,
-                ("python",),
+                (language, language),
             )
 
             syntaxes = cursor.fetchall()
@@ -115,6 +154,6 @@ def get_syntaxes():
         connection.close()
 
     return {
-        "language": "python",
+        "language": language,
         "syntaxes": syntaxes,
     }
