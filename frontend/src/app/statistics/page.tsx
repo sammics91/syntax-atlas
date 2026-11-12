@@ -41,7 +41,7 @@ export default function StatisticsPage() {
   const [statistics, setStatistics] = useState<StatisticsResult | null>(null);
   // 目前選取的語言頁籤
   const [selectedLanguage, setSelectedLanguage] =
-    useState<StatisticsLanguage>("python");
+    useState<StatisticsLanguage | null>(null);
   // 一次只展開一筆語法說明。
   const [expandedSyntaxId, setExpandedSyntaxId] = useState<number | null>(null);
   // 資料載入與錯誤提示
@@ -190,9 +190,10 @@ export default function StatisticsPage() {
     0,
   );
 
-  // 尚未使用的語言不占寬度，也不顯示頁籤。
+  // 隱藏尚未使用的語言，依累積使用次數由多到少排列並計算占比。
   const languageTabs = languageTotals
     .filter((language) => language.count > 0)
+    .sort((a, b) => b.count - a.count)
     .map((language) => ({
       ...language,
       percentage: (language.count / totalCount) * 100,

@@ -100,12 +100,17 @@
   min-width: 0;
 }
 
-.languageSegment[data-language="python"] {
+/* 占比由大到小：綠、金、灰 */
+.languageSegment:nth-child(1) {
   background: var(--primary);
 }
 
-.languageSegment[data-language="html"] {
+.languageSegment:nth-child(2) {
   background: var(--accent);
+}
+
+.languageSegment:nth-child(3) {
+  background: var(--chart-gray);
 }
 
 /* 語言切換選單 */
@@ -178,15 +183,22 @@
   font-weight: 700;
 }
 
-.languageTabActive[data-language="python"] {
+/* 選取時，底色對應該語言目前的占比排名 */
+.languageTabActive:nth-child(1) {
   --tab-bg: var(--primary);
   --tab-border: var(--primary);
   color: var(--surface);
 }
 
-.languageTabActive[data-language="html"] {
+.languageTabActive:nth-child(2) {
   --tab-bg: var(--accent);
   --tab-border: var(--accent);
+  color: var(--text);
+}
+
+.languageTabActive:nth-child(3) {
+  --tab-bg: var(--chart-gray);
+  --tab-border: var(--chart-gray);
   color: var(--text);
 }
 
