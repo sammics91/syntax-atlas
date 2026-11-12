@@ -237,7 +237,22 @@ export default function RecordsPage() {
                   aria-label={`刪除紀錄 #${record.record_number}`}
                   onClick={() => handleDelete(record)}
                 >
-                  刪除
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="22"
+                    height="22"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M3 6h18" />
+                    <path d="M9 6V4h6v2" />
+                    <path d="M5 6l1 14h12l1-14" />
+                    <path d="M10 10v6M14 10v6" />
+                  </svg>
                 </button>
               </div>
 
