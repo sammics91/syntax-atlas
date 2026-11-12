@@ -706,7 +706,7 @@ export default function DictionaryPage() {
                       hidden={!isExpanded}
                     >
                       <div className={styles.explanation}>
-                        <h3>語法解釋</h3>
+                        <h3>語法解釋：</h3>
                         <p>{syntax.summary}</p>
 
                         <pre>

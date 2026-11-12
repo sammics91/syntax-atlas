@@ -53,6 +53,14 @@
   outline-offset: 2px;
 }
 
+/* 編輯器快捷鍵提示 */
+.editorHint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
 /*-- 字元數與分析按鈕 --*/
 .actions {
   scroll-margin-top: 12px;
@@ -148,6 +156,13 @@
   margin: 0;
   color: var(--error);
   line-height: 1.6;
+}
+
+/* 編輯器下方的提示、錯誤與紀錄狀態向右縮排 */
+.editorHint,
+.error,
+.actionInfo {
+  padding-left: 4px;
 }
 
 /*-- 分析結果 --*/
@@ -300,5 +315,11 @@
 
   .syntaxDetails {
     padding: 0 4px 16px;
+  }
+}
+
+@media (max-width: 440px) {
+  .editorHint {
+    display: none;
   }
 }

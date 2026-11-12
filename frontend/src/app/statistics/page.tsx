@@ -460,7 +460,7 @@ export default function StatisticsPage() {
 
                             <h3>
                               {syntax.display_label
-                                ? `${syntax.display_label} · 語法解釋`
+                                ? `${syntax.display_label} · 語法解釋：`
                                 : "語法解釋"}
                             </h3>
                           </div>
