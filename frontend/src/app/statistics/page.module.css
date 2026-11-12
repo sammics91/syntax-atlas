@@ -74,19 +74,143 @@
   outline-offset: 3px;
 }
 
-/* 常用語法區塊 */
+/* 常用語法整體區域 */
 .section {
   margin-top: 32px;
 }
 
-/* 語言標題與語法種類數 */
+/* 頁籤與占比條直接接著排名卡片 */
+.languageOverview {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0;
+}
+
+.languageTrack {
+  order: 2;
+  display: flex;
+  height: 8px;
+  margin: 0;
+  overflow: hidden;
+  background: var(--soft-bg);
+}
+
+.languageSegment {
+  flex-basis: 0;
+  min-width: 0;
+}
+
+.languageSegment[data-language="python"] {
+  background: var(--primary);
+}
+
+.languageSegment[data-language="html"] {
+  background: var(--accent);
+}
+
+/* 語言切換選單 */
+.languageTabs {
+  order: 1;
+  display: flex;
+  gap: 0;
+}
+
+.languageTab {
+  --tab-bg: var(--surface);
+  --tab-border: var(--border);
+
+  position: relative;
+  isolation: isolate;
+  flex-basis: 0;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  line-height: 1.5;
+  cursor: pointer;
+  transition: filter 150ms ease;
+}
+
+/* 固定小斜度，不隨頁籤寬度放大 */
+.languageTab::before,
+.languageTab::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: -1;
+  width: calc(50% + 1px);
+  border: 1px solid var(--tab-border);
+  border-bottom: none;
+  background: var(--tab-bg);
+  transform-origin: bottom;
+}
+
+.languageTab::before {
+  left: 0;
+  border-right: none;
+  border-top-left-radius: 10px;
+  transform: skewX(-5deg);
+}
+
+.languageTab::after {
+  right: 0;
+  border-left: none;
+  border-top-right-radius: 10px;
+  transform: skewX(5deg);
+}
+
+/* 語言名稱與百分比 */
+.languageTabLabel {
+  display: block;
+  overflow: hidden;
+  padding: 12px 14px 6px;
+  font-size: 14px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 選取狀態沿用目前配色 */
+.languageTabActive {
+  font-weight: 700;
+}
+
+.languageTabActive[data-language="python"] {
+  --tab-bg: var(--primary);
+  --tab-border: var(--primary);
+  color: var(--surface);
+}
+
+.languageTabActive[data-language="html"] {
+  --tab-bg: var(--accent);
+  --tab-border: var(--accent);
+  color: var(--text);
+}
+
+.languageTab:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* 白底從排名標題開始 */
+.card {
+  padding: 24px 28px;
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  background: var(--surface);
+}
+
 .heading {
   display: flex;
+  align-items: baseline;
   justify-content: space-between;
-  align-items: center;
   flex-wrap: wrap;
   gap: 12px;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .heading h2 {
@@ -98,14 +222,6 @@
 .heading > span {
   color: var(--text-muted);
   font-size: 14px;
-}
-
-/* 排名卡片 */
-.card {
-  padding: 24px 28px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 6px;
 }
 
 .noUsages {
@@ -154,8 +270,22 @@
   line-height: 1.5;
 }
 
+/* 點擊名稱展開說明 */
 .name {
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
   overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.name:focus-visible {
+  outline: 2px solid var(--chart-gray);
+  outline-offset: 4px;
 }
 
 .count {
@@ -175,11 +305,100 @@
   background: var(--primary);
 }
 
+/* 排名長條下方的語法說明 */
+.syntaxDetails {
+  margin-top: 20px;
+  padding: 16px 18px;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 4px 4px 0;
+  background: var(--page-bg);
+}
+
+/* 解釋標題與收藏按鈕相鄰 */
+.detailsHeading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: -5px;
+  margin-bottom: 10px;
+}
+
+.syntaxDetails h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.bookmarkButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.bookmarkButton.bookmarked {
+  color: var(--accent-light);
+}
+
+.bookmarkButton:focus-visible {
+  outline: 2px solid var(--chart-gray);
+  outline-offset: 2px;
+}
+
+.bookmarkButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.syntaxDetails .bookmarkNotice {
+  margin-bottom: 10px;
+  color: var(--error);
+  font-size: 13px;
+}
+
+.syntaxDetails p {
+  margin: 0;
+  line-height: 1.8;
+}
+
+.syntaxDetails pre {
+  margin: 16px 0 0;
+  overflow-x: auto;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+/* 解釋與範例向右縮排，標題位置不變 */
+@media (min-width: 1200px) {
+  .syntaxDetails > p,
+  .syntaxDetails > pre {
+    margin-left: 30px;
+  }
+}
+
 /* 手機版 */
 @media (max-width: 640px) {
   .empty {
     margin-top: 24px;
     padding: 28px 16px;
+  }
+
+  .languageTabLabel {
+    padding: 12px 6px 6px;
+    font-size: 14px;
+  }
+
+  .section {
+    padding: 20px 16px;
   }
 
   .card {
@@ -196,5 +415,20 @@
 
   .count {
     font-size: 14px;
+  }
+}
+
+/* 滑鼠移入效果，排除窄手機 */
+@media (min-width: 441px) {
+  .languageTab:hover {
+    filter: brightness(0.95);
+  }
+
+  .name:hover {
+    color: var(--accent-light);
+  }
+
+  .bookmarkButton:hover:not(:disabled) {
+    color: var(--accent-light);
   }
 }

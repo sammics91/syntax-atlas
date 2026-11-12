@@ -26,6 +26,9 @@ def get_statistics(
                 SELECT
                     s.id,
                     s.name,
+                    s.display_label,
+                    COALESCE(s.summary, '') AS summary,
+                    COALESCE(s.example_code, '') AS example_code,
                     c.language,
                     SUM(rsu.usage_count) AS usage_count
                 FROM record_syntax_usage AS rsu
@@ -82,6 +85,9 @@ def get_statistics(
             {
                 "id": row["id"],
                 "name": row["name"],
+                "display_label": row["display_label"],
+                "summary": row["summary"],
+                "example_code": row["example_code"],
                 "language": row["language"],
                 "count": int(row["usage_count"]),
             }
