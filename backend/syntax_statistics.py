@@ -1,3 +1,5 @@
+from typing import Literal
+
 from fastapi import APIRouter, Depends
 
 from auth import get_current_user
@@ -7,9 +9,12 @@ from database import get_db_connection
 router = APIRouter(prefix="/api", tags=["常用語法"])
 
 
-# 取得目前會員的 Python 語法累積使用次數
+# 取得目前會員已儲存的語法累積使用次數。
 @router.get("/statistics")
-def get_statistics(user: dict = Depends(get_current_user)):
+def get_statistics(
+    language: Literal["python", "html", "all"] = "python",
+    user: dict = Depends(get_current_user),
+):
     connection = get_db_connection()
 
     try:
@@ -21,6 +26,10 @@ def get_statistics(user: dict = Depends(get_current_user)):
                 SELECT
                     s.id,
                     s.name,
+                    s.display_label,
+                    COALESCE(s.summary, '') AS summary,
+                    COALESCE(s.example_code, '') AS example_code,
+                    c.language,
                     SUM(rsu.usage_count) AS usage_count
                 FROM record_syntax_usage AS rsu
                 JOIN records AS r
@@ -30,29 +39,35 @@ def get_statistics(user: dict = Depends(get_current_user)):
                 JOIN syntax_categories AS c
                     ON s.category_id = c.id
                 WHERE r.user_id = %s
-                  AND r.language = %s
-                  AND c.language = %s
-                GROUP BY s.id, s.name, s.sort_key
+                  AND (
+                      %s = 'all'
+                      OR c.language = %s
+                  )
+                GROUP BY
+                    s.id, s.name, c.language, s.sort_key
                 HAVING SUM(rsu.usage_count) > 0
                 ORDER BY
                     usage_count DESC,
                     s.sort_key ASC,
                     s.id ASC
                 """,
-                (user["id"], "python", "python"),
+                (user["id"], language, language),
             )
 
             rows = cursor.fetchall()
 
-                        # 計算會員的 Python 紀錄筆數，包含保留統計的紀錄
+            # 紀錄筆數包含「已刪除程式碼、保留統計」的紀錄。
             cursor.execute(
                 """
                 SELECT COUNT(*) AS record_count
                 FROM records
                 WHERE user_id = %s
-                  AND language = %s
+                  AND (
+                      %s = 'all'
+                      OR language = %s
+                  )
                 """,
-                (user["id"], "python"),
+                (user["id"], language, language),
             )
 
             record_count = cursor.fetchone()["record_count"]
@@ -63,13 +78,17 @@ def get_statistics(user: dict = Depends(get_current_user)):
     finally:
         connection.close()
 
-        return {
-        "language": "python",
+    return {
+        "language": language,
         "record_count": int(record_count),
         "usages": [
             {
                 "id": row["id"],
                 "name": row["name"],
+                "display_label": row["display_label"],
+                "summary": row["summary"],
+                "example_code": row["example_code"],
+                "language": row["language"],
                 "count": int(row["usage_count"]),
             }
             for row in rows

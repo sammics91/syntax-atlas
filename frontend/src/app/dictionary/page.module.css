@@ -112,23 +112,65 @@
   margin-top: 30px;
 }
 
-/* 語言標題與收藏篩選 */
+/* 語言頁籤與收藏篩選 */
 .summary {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px 32px;
-  margin-bottom: 8px;
+  gap: 12px 24px;
+  margin-bottom: 0px;
 }
 
-.languageTitle {
-  display: table;
-  margin: 0;
-  padding: 0 12px 10px;
-  border-bottom: 2px solid var(--primary);
-  color: var(--primary);
+.languageTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0px;
+  padding-inline: 8px;
+}
+
+.languageTab {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 14px 20px 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
   font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* 底圖上窄下寬，搭配圓角 */
+.languageTab::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 10px 10px 0 0;
+  background: var(--soft-bg);
+  transform: perspective(60px) rotateX(9deg);
+  transform-origin: bottom;
+}
+
+.languageTab:hover {
+  color: var(--primary);
+}
+
+.languageTabActive {
+  color: var(--primary);
   font-weight: 700;
+}
+
+.languageTabActive::before {
+  background: var(--surface);
 }
 
 /* 僅顯示我的收藏 */
@@ -149,7 +191,6 @@
 .bookmarkFilter:hover:not(:disabled),
 .bookmarkFilterActive {
   color: var(--primary);
-  background: var(--soft-bg);
 }
 
 .bookmarkFilter:focus-visible {
@@ -353,6 +394,10 @@
 
 /*-- 手機版 --*/
 @media (max-width: 640px) {
+  .summary {
+    gap: 8px 16px;
+  }
+
   .row {
     padding: 14px 14px 14px 4px;
   }
@@ -372,6 +417,29 @@
 
   .explanation {
     padding-left: 12px;
+  }
+}
+
+/* 窄螢幕：收藏篩選換到白底工具列 */
+@media (max-width: 440px) {
+  .summary {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    margin-bottom: 0;
+  }
+
+  .languageTabs {
+    gap: 0;
+    padding-inline: 8px;
+  }
+
+  .bookmarkFilter {
+    width: 100%;
+    justify-content: flex-start;
+    padding: 12px 16px;
+    border-radius: 4px;
+    background: var(--surface);
   }
 }
 

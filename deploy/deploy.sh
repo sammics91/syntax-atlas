@@ -31,7 +31,7 @@ trap 'echo "部署未完成，請查看失敗步驟；不會自動還原資料�
 echo "部署版本：$RELEASE_SHA"
 
 echo "1. 下載前後端映像"
-"${compose[@]}" pull backend frontend
+"${compose[@]}" pull backend frontend html-validator
 
 echo "2. 檢查更新檔"
 "${compose[@]}" run --rm --no-deps backend python migrate.py
@@ -51,6 +51,7 @@ echo "4. 套用資料庫更新"
 "${compose[@]}" run --rm --no-deps backend python migrate.py --apply
 
 echo "5. 更新前後端容器"
+"${compose[@]}" up -d --no-deps html-validator
 "${compose[@]}" up -d --no-deps backend frontend
 
 echo "6. 等待網站與 API 正常"

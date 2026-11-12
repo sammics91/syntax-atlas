@@ -7,8 +7,19 @@ import { useAuth } from "@/components/AuthProvider";
 
 import styles from "./page.module.css";
 
+type DictionaryLanguage = "python" | "html";
+
+const DICTIONARY_LANGUAGES: {
+  value: DictionaryLanguage;
+  label: string;
+}[] = [
+  { value: "python", label: "Python" },
+  { value: "html", label: "HTML" },
+];
+
 type SyntaxEntry = {
   id: number;
+  language: DictionaryLanguage;
   slug: string;
   name: string;
   display_label: string | null;
@@ -106,10 +117,14 @@ export default function DictionaryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchInput, setSearchInput] = useState("");
+  // null 代表依搜尋結果自動選擇；點擊頁籤後使用指定語言。
+  const [selectedLanguage, setSelectedLanguage] =
+    useState<DictionaryLanguage | null>(null);
   const [hasSubmittedSearch, setHasSubmittedSearch] = useState(false);
   // 收藏篩選與會員身分綁定
-  const [bookmarkFilterOwnerId, setBookmarkFilterOwnerId] =
-    useState<number | null>(null);
+  const [bookmarkFilterOwnerId, setBookmarkFilterOwnerId] = useState<
+    number | null
+  >(null);
   const [usageState, setUsageState] = useState<{
     userId: number;
     counts: Record<number, number>;
@@ -198,7 +213,7 @@ export default function DictionaryPage() {
 
     async function loadUsage() {
       try {
-        const response = await fetch("/api/statistics", {
+        const response = await fetch("/api/statistics?language=all", {
           credentials: "include",
           cache: "no-store",
           signal: controller.signal,
@@ -278,10 +293,10 @@ export default function DictionaryPage() {
 
   const isBookmarkFilterActive = Boolean(
     !isAuthLoading &&
-      user &&
-      bookmarkFilterOwnerId === user.id &&
-      currentBookmarks &&
-      !currentBookmarks.error,
+    user &&
+    bookmarkFilterOwnerId === user.id &&
+    currentBookmarks &&
+    !currentBookmarks.error,
   );
 
   // 先選擇全部語法或目前會員的收藏，再搜尋與排序
@@ -289,17 +304,54 @@ export default function DictionaryPage() {
     ? syntaxes.filter((syntax) => currentBookmarks?.ids.includes(syntax.id))
     : syntaxes;
 
-  // 搜尋先依符合程度；沒有搜尋或同等符合時，使用固定辭典排序
-  const visibleSyntaxes = sourceSyntaxes
-    .map((syntax) => ({ syntax, rank: searchRank(syntax, searchInput) }))
+  // 先跨語言搜尋；相同符合程度時，Python 優先，再依辭典排序。
+  const rankedSyntaxes = sourceSyntaxes
+    .map((syntax) => ({
+      syntax,
+      rank: searchRank(syntax, searchInput),
+    }))
     .filter(({ rank }) => Number.isFinite(rank))
     .sort(
-      (a, b) => a.rank - b.rank || compareDictionaryEntries(a.syntax, b.syntax),
-    )
-    .map(({ syntax }) => syntax);
+      (a, b) =>
+        a.rank - b.rank ||
+        DICTIONARY_LANGUAGES.findIndex(
+          (language) => language.value === a.syntax.language,
+        ) -
+          DICTIONARY_LANGUAGES.findIndex(
+            (language) => language.value === b.syntax.language,
+          ) ||
+        compareDictionaryEntries(a.syntax, b.syntax),
+    );
+
+  const matchingSyntaxes = rankedSyntaxes.map(({ syntax }) => syntax);
+
+  // 沒有手動指定頁籤時，搜尋會選擇符合程度最高的語言。
+  // 沒搜尋或完全找不到結果時，預設顯示 Python。
+  const activeLanguage =
+    selectedLanguage ??
+    (isSearching ? rankedSyntaxes[0]?.syntax.language : undefined) ??
+    "python";
+
+  // 每個語言頁籤各自顯示符合的項目數。
+  const languageCounts = {
+    python: matchingSyntaxes.filter((syntax) => syntax.language === "python")
+      .length,
+    html: matchingSyntaxes.filter((syntax) => syntax.language === "html")
+      .length,
+  };
+
+  // 列表只顯示目前語言，保留上面已完成的搜尋排序。
+  const visibleSyntaxes = matchingSyntaxes.filter(
+    (syntax) => syntax.language === activeLanguage,
+  );
+
+  const currentLanguageSource = sourceSyntaxes.filter(
+    (syntax) => syntax.language === activeLanguage,
+  );
 
   function clearSearch() {
     setSearchInput("");
+    setSelectedLanguage(null);
     setHasSubmittedSearch(false);
     setExpandedSlug(null);
   }
@@ -383,6 +435,7 @@ export default function DictionaryPage() {
         role="search"
         onSubmit={(event) => {
           event.preventDefault();
+          setSelectedLanguage(null);
           setHasSubmittedSearch(isSearching);
           setExpandedSlug(null);
         }}
@@ -399,6 +452,7 @@ export default function DictionaryPage() {
             disabled={isLoading || Boolean(error)}
             onChange={(event) => {
               setSearchInput(event.target.value);
+              setSelectedLanguage(null);
               setHasSubmittedSearch(false);
               setExpandedSlug(null);
             }}
@@ -444,7 +498,7 @@ export default function DictionaryPage() {
         syntaxes.length > 0 &&
         isSearching &&
         hasSubmittedSearch &&
-        visibleSyntaxes.length === 0 && (
+        matchingSyntaxes.length === 0 && (
           <p className={styles.noResults} role="status">
             找不到符合的語法，請試試其他關鍵字。
           </p>
@@ -461,9 +515,38 @@ export default function DictionaryPage() {
       ) : (
         <section className={styles.dictionary} aria-labelledby="language-title">
           <div className={styles.summary}>
-            <h2 id="language-title" className={styles.languageTitle}>
-              Python · 共 {visibleSyntaxes.length} 項
-            </h2>
+            <div
+              id="language-title"
+              className={styles.languageTabs}
+              role="group"
+              aria-label="辭典語言"
+            >
+              {DICTIONARY_LANGUAGES.map((language) => (
+                <button
+                  key={language.value}
+                  type="button"
+                  className={`${styles.languageTab} ${
+                    activeLanguage === language.value
+                      ? styles.languageTabActive
+                      : ""
+                  }`}
+                  aria-pressed={activeLanguage === language.value}
+                  aria-label={`${language.label}，${
+                    isBookmarkFilterActive ? "收藏" : "共"
+                  } ${languageCounts[language.value]} 項`}
+                  onClick={() => {
+                    setSelectedLanguage(language.value);
+                    setExpandedSlug(null);
+                  }}
+                >
+                  <span>{language.label}</span>
+
+                  <span className={styles.languageCount}>
+                    ({languageCounts[language.value]})
+                  </span>
+                </button>
+              ))}
+            </div>
 
             {!isAuthLoading && user && (
               <button
@@ -484,7 +567,8 @@ export default function DictionaryPage() {
                     isBookmarkFilterActive ? null : user.id,
                   );
 
-                  // 切換篩選時收合說明，保留搜尋文字
+                  // 依篩選後的搜尋結果重新選擇語言，並收合說明。
+                  setSelectedLanguage(null);
                   setExpandedSlug(null);
                 }}
               >
@@ -498,14 +582,16 @@ export default function DictionaryPage() {
 
           {syntaxes.length === 0 ? (
             <p className={styles.message}>目前尚無語法資料。</p>
-          ) : isBookmarkFilterActive && visibleSyntaxes.length === 0 ? (
-            (!isSearching || hasSubmittedSearch) && (
-              <p className={styles.emptyBookmarks} role="status">
-                {sourceSyntaxes.length === 0
-                  ? "尚未收藏任何語法，可點選語法前方的書籤圖示加入收藏。"
-                  : "收藏中找不到符合的語法，請試試其他關鍵字。"}
-              </p>
-            )
+          ) : visibleSyntaxes.length === 0 ? (
+            <p className={styles.emptyBookmarks} role="status">
+              {isBookmarkFilterActive
+                ? currentLanguageSource.length === 0
+                  ? "此語言尚未收藏任何語法，可點選語法前方的書籤圖示加入收藏。"
+                  : "此語言的收藏中找不到符合的語法，請試試其他關鍵字。"
+                : isSearching
+                  ? "此語言找不到符合的語法，請切換其他語言或修改關鍵字。"
+                  : "此語言目前尚無語法資料。"}
+            </p>
           ) : (
             <ul className={styles.list}>
               {visibleSyntaxes.map((syntax) => {

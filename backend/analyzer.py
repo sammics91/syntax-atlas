@@ -313,6 +313,7 @@ def analyze_python(code: str):
     return [
         {
             "syntax_id": syntax_id,
+            "language": "python",
             "slug": syntax_details[syntax_id]["slug"],
             "name": syntax_details[syntax_id]["name"],
             "display_label": syntax_details[syntax_id]["display_label"],

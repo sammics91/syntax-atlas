@@ -1,9 +1,17 @@
+import ast
+import re
+from collections import Counter
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from analyzer import analyze_python
+from analyzer_html import (
+    HTMLValidationError,
+    HTMLValidationServiceError,
+    analyze_html,
+)
 from auth import router as auth_router
 from bookmarks import router as bookmarks_router
 from database import get_db_connection
@@ -22,17 +30,76 @@ app.include_router(password_reset_router)
 app.include_router(records_router)
 app.include_router(statistics_router)
 
-# 分析請求的資料格式，目前先支援 Python
+# 分析請求的資料格式，目前先支援 Python / HTML
 class AnalysisRequest(BaseModel):
-    language: Literal["python"]
+    language: Literal["python", "html"] | None = None
     code: str = Field(min_length=1, max_length=20000)
+
+    # 僅供 HTML 使用；預設分析一般內容片段。
+    html_mode: Literal["document", "fragment"] = "fragment"
+    html_context: Literal[
+        "div", "ul", "ol", "table", "tbody", "tr", "select"
+    ] = "div"
 
 
 # 依程式語言選擇分析器
 ANALYZERS = {
     "python": analyze_python,
+    "html": analyze_html,
 }
 
+# 未指定語言時，先判斷程式碼適合交給哪個分析器。
+def detect_language(code: str) -> str:
+    # 能完整解析成 Python，就交給 Python 分析器。
+    # Python 字串裡即使出現 HTML，也不另外拆開分析。
+    try:
+        ast.parse(code)
+    except SyntaxError:
+        pass
+    else:
+        return "python"
+
+    # 開頭具有 HTML 標籤、註解或文件宣告時，
+    # 交給 HTML 分析器進一步驗證，並非直接認定語法正確。
+    if re.match(
+        r"\s*(?:<!--|<!doctype\b|</?[a-z][a-z0-9:-]*(?=[\s/>]))",
+        code,
+        flags=re.IGNORECASE,
+    ):
+        return "html"
+
+    raise HTTPException(
+        status_code=400,
+        detail="無法自動辨識程式語言，請選擇語言後再試。",
+    )
+
+# 計算本次分析中各語言的語法使用次數與占比
+def build_language_stats(syntaxes):
+    # 加總語法出現次數，不是語法種類數。
+    usage_counts = Counter()
+
+    for syntax in syntaxes:
+        usage_counts[syntax["language"]] += syntax["count"]
+
+    total_usage_count = sum(usage_counts.values())
+
+    language_stats = [
+        {
+            "language": language,
+            "usage_count": count,
+            "percentage": round(
+                count / total_usage_count * 100,
+                1,
+            ),
+        }
+        for language, count in sorted(
+            usage_counts.items(),
+            key=lambda item: (-item[1], item[0]),
+        )
+        if count > 0
+    ]
+
+    return language_stats, total_usage_count
 
 # POST /api/analyses：分析程式碼
 @app.post("/api/analyses")
@@ -49,14 +116,32 @@ def create_analysis(request: AnalysisRequest):
             detail="程式碼不能包含空字元。",
         )
 
-    analyzer = ANALYZERS[request.language]
+    language = request.language or detect_language(request.code)
+    analyzer = ANALYZERS[language]
 
     try:
-        syntaxes = analyzer(request.code)
+        if language == "html":
+            syntaxes = analyzer(
+                request.code,
+                mode=request.html_mode,
+                context=request.html_context,
+            )
+        else:
+            syntaxes = analyzer(request.code)
+
+    # HTMLValidationError 繼承 SyntaxError，
+    # 必須放在一般 SyntaxError 前面，才能保留全部錯誤。
+    except HTMLValidationError as error:
+        return {
+            "language": language,
+            "valid": False,
+            "syntaxes": [],
+            "errors": error.errors,
+        }
 
     except SyntaxError as error:
         return {
-            "language": request.language,
+            "language": language,
             "valid": False,
             "syntaxes": [],
             "errors": [
@@ -68,17 +153,30 @@ def create_analysis(request: AnalysisRequest):
             ],
         }
 
+    # 驗證器無法連線屬於服務問題，不當成使用者的語法錯誤。
+    except HTMLValidationServiceError as error:
+        raise HTTPException(
+            status_code=503,
+            detail=str(error),
+        ) from error
+
+    language_stats, total_usage_count = build_language_stats(syntaxes)
+
     return {
-        "language": request.language,
+        "language": language,
         "valid": True,
         "syntaxes": syntaxes,
+        "language_stats": language_stats,
+        "total_usage_count": total_usage_count,
         "errors": [],
     }
 
 
 # GET /api/syntaxes：取得語法辭典
 @app.get("/api/syntaxes")
-def get_syntaxes():
+def get_syntaxes(
+    language: Literal["python", "html"] | None = None,
+):
     connection = get_db_connection()
 
     try:
@@ -92,6 +190,7 @@ def get_syntaxes():
                     s.slug,
                     s.name,
                     s.display_label,
+                    c.language,
                     c.name AS category_name,
                     COALESCE(s.summary, '') AS summary,
                     COALESCE(s.example_description, '') AS example_description,
@@ -99,11 +198,11 @@ def get_syntaxes():
                 FROM syntaxes AS s
                 JOIN syntax_categories AS c
                     ON s.category_id = c.id
-                WHERE c.language = %s
-                  AND s.is_active = TRUE
+                WHERE (%s IS NULL OR c.language = %s)
+                AND s.is_active = TRUE
                 ORDER BY s.sort_key, s.id
                 """,
-                ("python",),
+                (language, language),
             )
 
             syntaxes = cursor.fetchall()
@@ -115,6 +214,6 @@ def get_syntaxes():
         connection.close()
 
     return {
-        "language": "python",
+        "language": language,
         "syntaxes": syntaxes,
     }

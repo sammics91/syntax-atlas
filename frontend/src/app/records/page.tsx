@@ -242,7 +242,11 @@ export default function RecordsPage() {
               </div>
 
               <p className={styles.recordMeta}>
-                {record.language === "python" ? "Python" : record.language}
+                {record.language === "python"
+                  ? "Python"
+                  : record.language === "html"
+                    ? "HTML"
+                    : record.language}
                 {" · "}
                 {record.created_at.slice(0, 10).replaceAll("-", "/")}
                 {" · "}

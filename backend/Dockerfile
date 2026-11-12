@@ -14,6 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY main.py \
      database.py \
      analyzer.py \
+     analyzer_html.py \
      auth.py \
      records.py \
      syntax_statistics.py \

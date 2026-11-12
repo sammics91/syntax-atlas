@@ -4,6 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from analyzer import analyze_python
+from analyzer_html import (
+    HTMLValidationError,
+    HTMLValidationServiceError,
+    analyze_html,
+)
 from auth import get_current_user
 from database import get_db_connection
 
@@ -14,9 +19,46 @@ router = APIRouter(prefix="/api", tags=["程式碼紀錄"])
 # 儲存紀錄時接收的資料
 class RecordCreateRequest(BaseModel):
     title: str | None = Field(default=None, max_length=100)
-    language: Literal["python"]
+    language: Literal["python", "html"]
     code: str = Field(min_length=1, max_length=20000)
 
+# 新增與更新紀錄時，都由後端重新驗證並計算語法次數。
+def analyze_record_code(request: RecordCreateRequest):
+    try:
+        if request.language == "html":
+            return analyze_html(request.code)
+
+        return analyze_python(request.code)
+
+    except HTMLValidationError as error:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "HTML 語法有誤，無法儲存。",
+                "errors": error.errors,
+            },
+        ) from error
+
+    except SyntaxError as error:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "程式碼語法有誤，無法儲存。",
+                "errors": [
+                    {
+                        "message": error.msg,
+                        "line": error.lineno,
+                        "column": error.offset,
+                    }
+                ],
+            },
+        ) from error
+
+    except HTMLValidationServiceError as error:
+        raise HTTPException(
+            status_code=503,
+            detail=str(error),
+        ) from error
 
 # 儲存程式碼與分析次數
 @router.post("/records", status_code=201)
@@ -39,22 +81,7 @@ def create_record(
         )
 
     # 由後端重新分析，不信任前端傳入的統計次數
-    try:
-        syntaxes = analyze_python(request.code)
-    except SyntaxError as error:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "message": "程式碼語法有誤，無法儲存。",
-                "errors": [
-                    {
-                        "message": error.msg,
-                        "line": error.lineno,
-                        "column": error.offset,
-                    }
-                ],
-            },
-        ) from error
+    syntaxes = analyze_record_code(request)
 
     connection = get_db_connection()
 
@@ -271,22 +298,7 @@ def update_record(
         )
 
     # 使用更新後的程式碼重新分析
-    try:
-        syntaxes = analyze_python(request.code)
-    except SyntaxError as error:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "message": "程式碼語法有誤，無法儲存。",
-                "errors": [
-                    {
-                        "message": error.msg,
-                        "line": error.lineno,
-                        "column": error.offset,
-                    }
-                ],
-            },
-        ) from error
+    syntaxes = analyze_record_code(request)
 
     connection = get_db_connection()
 

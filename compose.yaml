@@ -13,6 +13,8 @@ services:
     environment:
       # 容器連到 Windows 上的 MySQL
       DB_HOST: host.docker.internal
+      # HTML驗證服務
+      HTML_VALIDATOR_URL: http://html-validator:8888/
 
     restart: unless-stopped
 
@@ -29,5 +31,14 @@ services:
 
     depends_on:
       - backend
+
+    restart: unless-stopped
+
+  # HTML驗證服務
+  html-validator:
+    image: ghcr.io/validator/validator@sha256:292cef9f3367a6d52447c617e65c94bca04cd3399abb37bd5d17c1c7d430525a
+
+    ports:
+      - "127.0.0.1:8888:8888"
 
     restart: unless-stopped
