@@ -5,8 +5,15 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import AuthDialog from "@/components/AuthDialog";
 import { useAuth } from "@/components/AuthProvider";
+import dynamic from "next/dynamic";
 
 import styles from "./page.module.css";
+
+// 編輯器只在瀏覽器載入。
+const CodeEditor = dynamic(() => import("@/components/CodeEditor"), {
+  ssr: false,
+  loading: () => <p role="status">正在載入編輯器…</p>,
+});
 
 // 分析結果的型別
 type SyntaxResult = {
@@ -434,24 +441,21 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
         </div>
 
         <div className={styles.codeField}>
-          <textarea
-            id="code-content"
-            name="code"
-            aria-label="程式碼內容"
-            placeholder="在這裡貼上你的 Python 或 HTML 程式碼"
-            spellCheck={false}
-            autoCapitalize="off"
-            autoCorrect="off"
-            disabled={isAnalyzing || isSaving}
+          <CodeEditor
             value={code}
-            onChange={(event) => {
-              setCode(event.target.value);
+            disabled={isAnalyzing || isSaving}
+            onChange={(nextCode) => {
+              setCode(nextCode);
               setResult(null);
               setExpandedSlug(null);
               setError("");
               setSavedRecordNumber(null);
             }}
           />
+
+          <p className={styles.editorHint}>
+            Tab 縮排，Shift＋Tab 減少縮排；按 Esc 後再按 Tab 可離開編輯器。
+          </p>
         </div>
 
         {error && (
