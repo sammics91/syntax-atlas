@@ -3,6 +3,8 @@ import re
 from collections import Counter
 from typing import Literal
 
+from fastapi.responses import JSONResponse
+from mysql.connector.errors import PoolError
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
@@ -22,6 +24,14 @@ from syntax_statistics import router as statistics_router
 
 
 app = FastAPI()
+
+# 連線池暫時沒有可用連線時，提示使用者稍後再試。
+@app.exception_handler(PoolError)
+async def handle_pool_error(_request, _error):
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "目前服務忙碌中，請稍後再試。"},
+    )
 
 # 掛載 API
 app.include_router(auth_router)
