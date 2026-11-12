@@ -151,11 +151,34 @@ def extract_embedded_code(code: str) -> list[dict]:
 
     return parser.blocks
 
+# 判斷原始碼是否包含完整文件的宣告或外層元素。
+class HTMLModeParser(HTMLSyntaxParser):
+    def __init__(self):
+        super().__init__()
+        self.has_doctype = False
+
+    def handle_decl(self, declaration):
+        if declaration.lower().startswith("doctype"):
+            self.has_doctype = True
+
+
+def detect_html_mode(code: str) -> str:
+    parser = HTMLModeParser()
+    parser.feed(code)
+    parser.close()
+
+    if parser.has_doctype or any(
+        tag in parser.tag_counts
+        for tag in ("html", "head", "body")
+    ):
+        return "document"
+
+    return "fragment"
 
 def validate_html(
     code: str,
     *,
-    mode: str = "fragment",
+    mode: str = "auto",
     context: str = "div",
 ) -> list[dict]:
     """回傳 HTML 錯誤；空清單代表本次檢查沒有發現錯誤。"""
@@ -178,8 +201,13 @@ def validate_html(
             }
         ]
 
+    if mode == "auto":
+        mode = detect_html_mode(code)
+
     if mode not in {"document", "fragment"}:
-        raise ValueError("HTML 模式必須是 document 或 fragment。")
+        raise ValueError(
+            "HTML 模式必須是 auto、document 或 fragment。"
+        )
 
     line_offset = 0
 
@@ -360,7 +388,7 @@ def get_html_detection_rules():
 def analyze_html(
     code: str,
     *,
-    mode: str = "fragment",
+    mode: str = "auto",
     context: str = "div",
 ):
     """先驗證 HTML，再依資料庫規則回傳各語法的出現次數。"""

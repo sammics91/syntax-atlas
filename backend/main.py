@@ -35,8 +35,8 @@ class AnalysisRequest(BaseModel):
     language: Literal["python", "html"] | None = None
     code: str = Field(min_length=1, max_length=20000)
 
-    # 僅供 HTML 使用；預設分析一般內容片段。
-    html_mode: Literal["document", "fragment"] = "fragment"
+    # 自動判斷完整 HTML 文件或片段，也允許明確指定模式。
+    html_mode: Literal["auto", "document", "fragment"] = "auto"
     html_context: Literal[
         "div", "ul", "ol", "table", "tbody", "tr", "select"
     ] = "div"
