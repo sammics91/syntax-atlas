@@ -392,6 +392,19 @@
   line-height: 1.7;
 }
 
+/* 範例下方的官方文件連結 */
+.sourceLink {
+  display: inline-block;
+  margin-top: 14px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.sourceLink:focus-visible {
+  outline: 2px solid var(--chart-gray);
+  outline-offset: 3px;
+}
+
 /*-- 手機版 --*/
 @media (max-width: 640px) {
   .summary {
@@ -451,5 +464,14 @@
 
   .item:hover {
     transform: none;
+  }
+}
+
+/* 滑鼠移入效果，排除窄手機 */
+@media (min-width: 441px) {
+  .sourceLink:hover {
+    color: var(--accent-on-green);
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
 }

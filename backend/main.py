@@ -200,6 +200,7 @@ def get_syntaxes(
                     s.slug,
                     s.name,
                     s.display_label,
+                    s.source_url,
                     c.language,
                     c.name AS category_name,
                     COALESCE(s.summary, '') AS summary,

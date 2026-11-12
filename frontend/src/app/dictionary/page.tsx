@@ -27,6 +27,7 @@ type SyntaxEntry = {
   summary: string;
   example_description: string;
   example_code: string;
+  source_url: string | null;
 };
 
 type MemberBookmarks = {
@@ -711,6 +712,16 @@ export default function DictionaryPage() {
                         <pre>
                           <code>{syntax.example_code}</code>
                         </pre>
+                        {syntax.source_url?.startsWith("https://") && (
+                          <a
+                            className={styles.sourceLink}
+                            href={syntax.source_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            查看官方文件 ↗
+                          </a>
+                        )}
                       </div>
                     </div>
                   </li>
