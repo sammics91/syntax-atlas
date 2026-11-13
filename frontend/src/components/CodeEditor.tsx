@@ -13,6 +13,8 @@ import {
 import { tags } from "@lezer/highlight";
 import { EditorView } from "@codemirror/view";
 
+import { wrappedLineIndent } from "./codeWrapping";
+
 type CodeEditorProps = {
   value: string;
   onChange: (value: string) => void;
@@ -103,6 +105,7 @@ export default function CodeEditor({
     () => [
       looksLikeHtml ? html() : looksLikeCss ? css() : python(),
       EditorView.lineWrapping,
+      wrappedLineIndent,
       syntaxHighlighting(editorHighlightStyle),
       indentUnit.of("    "),
       EditorView.contentAttributes.of({
