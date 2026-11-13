@@ -5,6 +5,7 @@ from html.parser import HTMLParser
 import html5lib
 import requests
 
+from analyzer_css import CSSValidationError, analyze_css
 from database import get_db_connection
 
 
@@ -464,3 +465,36 @@ def analyze_html(
         }
         for syntax_id in ordered_ids
     ]
+
+
+def analyze_html_with_css(code, *, mode="auto", context="div"):
+    """HTML 驗證通過後，分析實際寫出的樣式；相同語法合併次數。"""
+    syntaxes = analyze_html(code, mode=mode, context=context)
+    for block in extract_embedded_code(code):
+        if block["language"] != "css":
+            continue
+        try:
+            syntaxes.extend(analyze_css(block["code"], mode=block["mode"]))
+        except CSSValidationError as error:
+            errors = []
+            for detail in error.errors:
+                local_line = detail.get("line")
+                column = detail.get("column")
+                if block["mode"] == "declarations":
+                    # 屬性值經 HTML 字元解碼，不能假裝欄位仍精準對應原文。
+                    line, column = block["line"], None
+                else:
+                    line = block["line"] + local_line - 1 if local_line else None
+                    if local_line == 1 and column is not None:
+                        column += block["column"]
+                errors.append({**detail, "language": "css", "line": line, "column": column})
+            raise CSSValidationError(errors) from error
+
+    merged = {}
+    for syntax in syntaxes:
+        key = (syntax["language"], syntax["syntax_id"])
+        if key not in merged:
+            merged[key] = dict(syntax)
+        else:
+            merged[key]["count"] += syntax["count"]
+    return sorted(merged.values(), key=lambda item: (-item["count"], item["name"], item["syntax_id"]))
