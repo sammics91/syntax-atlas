@@ -15,8 +15,22 @@ const CodeEditor = dynamic(() => import("@/components/CodeEditor"), {
   loading: () => <p role="status">正在載入編輯器…</p>,
 });
 
+// 首頁支援的語言與顯示名稱。
+const LANGUAGE_LABELS = {
+  python: "Python",
+  html: "HTML",
+  css: "CSS",
+} as const;
+
+type AnalysisLanguage = keyof typeof LANGUAGE_LABELS;
+
+function isAnalysisLanguage(value: unknown): value is AnalysisLanguage {
+  return typeof value === "string" && Object.hasOwn(LANGUAGE_LABELS, value);
+}
+
 // 分析結果的型別
 type SyntaxResult = {
+  language: AnalysisLanguage;
   slug: string;
   name: string;
   display_label: string | null;
@@ -26,13 +40,14 @@ type SyntaxResult = {
 };
 
 type AnalysisError = {
+  language?: AnalysisLanguage;
   message: string;
   line: number | null;
   column: number | null;
 };
 
 type AnalysisResult = {
-  language: string;
+  language: AnalysisLanguage;
   valid: boolean;
   syntaxes: SyntaxResult[];
   errors: AnalysisError[];
@@ -134,7 +149,7 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
           String(data.id) !== recordId ||
           typeof data.record_number !== "number" ||
           typeof data.code !== "string" ||
-          (data.language !== "python" && data.language !== "html")
+          !isAnalysisLanguage(data.language)
         ) {
           throw new Error("紀錄內容格式異常，無法開啟編輯。");
         }
@@ -230,10 +245,14 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
       // 檢查回傳資料的基本結構
       if (
         !data ||
-        typeof data.language !== "string" ||
+        !isAnalysisLanguage(data.language) ||
         typeof data.valid !== "boolean" ||
         !Array.isArray(data.syntaxes) ||
-        !Array.isArray(data.errors)
+        !Array.isArray(data.errors) ||
+        !data.syntaxes.every(
+          (syntax: SyntaxResult) =>
+            syntax && isAnalysisLanguage(syntax.language),
+        )
       ) {
         setError("分析結果格式異常，請稍後再試。");
         return;
@@ -241,12 +260,13 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
 
       const analysis: AnalysisResult = data;
 
-      // 檢查是否符合所選語言的語法
+      // 檢查語法；HTML 內嵌 CSS 的錯誤依回傳的語言顯示。
       if (!analysis.valid) {
         const firstError = analysis.errors[0];
         const location = firstError?.line ? `第 ${firstError.line} 行：` : "";
 
-        const languageName = analysis.language === "python" ? "Python" : "HTML";
+        const languageName =
+          LANGUAGE_LABELS[firstError?.language ?? analysis.language];
 
         setError(
           `無法以 ${languageName} 語法解析。${location}${
@@ -538,7 +558,15 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
             </h2>
 
             <span>
-              {result.language === "python" ? "Python" : "HTML"}
+              {[
+                ...new Set(
+                  result.syntaxes.length > 0
+                    ? result.syntaxes.map((syntax) => syntax.language)
+                    : [result.language],
+                ),
+              ]
+                .map((language) => LANGUAGE_LABELS[language])
+                .join(" / ")}
               {" · 共 "}
               {result.syntaxes.length} 種
             </span>
@@ -551,12 +579,13 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
           ) : (
             <ul className={styles.syntaxList}>
               {result.syntaxes.map((syntax) => {
-                const isExpanded = expandedSlug === syntax.slug;
-                const buttonId = `syntax-button-${syntax.slug}`;
-                const panelId = `syntax-panel-${syntax.slug}`;
+                const syntaxKey = `${syntax.language}-${syntax.slug}`;
+                const isExpanded = expandedSlug === syntaxKey;
+                const buttonId = `syntax-button-${syntaxKey}`;
+                const panelId = `syntax-panel-${syntaxKey}`;
 
                 return (
-                  <li key={syntax.slug} className={styles.syntaxItem}>
+                  <li key={syntaxKey} className={styles.syntaxItem}>
                     <button
                       id={buttonId}
                       type="button"
@@ -565,7 +594,7 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
                       aria-controls={panelId}
                       onClick={() => {
                         setExpandedSlug((current) =>
-                          current === syntax.slug ? null : syntax.slug,
+                          current === syntaxKey ? null : syntaxKey,
                         );
                       }}
                     >

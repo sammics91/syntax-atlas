@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { html } from "@codemirror/lang-html";
+import { css } from "@codemirror/lang-css";
 import { python } from "@codemirror/lang-python";
 import {
   HighlightStyle,
@@ -93,10 +94,14 @@ export default function CodeEditor({
 }: CodeEditorProps) {
   // 只決定編輯器上色；正式語言辨識仍由後端負責。
   const looksLikeHtml = /^\s*</.test(value);
+  const looksLikeCss =
+    !looksLikeHtml &&
+    (/^\s*(?:\/\*[\s\S]*?\*\/\s*)*@[-a-z]+/i.test(value) ||
+      /\{\s*(?:\/\*[\s\S]*?\*\/\s*)*(?:--[\w-]+|[a-z-]+)\s*:/i.test(value));
 
   const extensions = useMemo(
     () => [
-      looksLikeHtml ? html() : python(),
+      looksLikeHtml ? html() : looksLikeCss ? css() : python(),
       syntaxHighlighting(editorHighlightStyle),
       indentUnit.of("    "),
       EditorView.contentAttributes.of({
@@ -106,7 +111,7 @@ export default function CodeEditor({
         autocorrect: "off",
       }),
     ],
-    [looksLikeHtml],
+    [looksLikeHtml, looksLikeCss],
   );
 
   return (
@@ -119,7 +124,7 @@ export default function CodeEditor({
       editable={!disabled}
       readOnly={disabled}
       indentWithTab
-      placeholder="在這裡貼上你的 Python 或 HTML 程式碼"
+      placeholder="在這裡貼上你的 Python、HTML 或 CSS 程式碼"
       basicSetup={{
         lineNumbers: true,
         foldGutter: true,
