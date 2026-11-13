@@ -98,11 +98,31 @@
 .languageSegment {
   flex-basis: 0;
   min-width: 0;
+  padding: 0;
+  border: none;
+  font: inherit;
+  cursor: pointer;
+  overflow: hidden;
+  background: var(--chart-gray);
+  color: var(--text);
+}
+
+.languageSegment:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: -2px;
+}
+
+.segmentPercentage {
+  display: none;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 /* 占比由大到小：綠、金、灰 */
 .languageSegment:nth-child(1) {
   background: var(--primary);
+  color: var(--surface);
 }
 
 .languageSegment:nth-child(2) {
@@ -176,6 +196,104 @@
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 放不下時改為中央目前語言、左右鄰近語言；占比條仍保留真實比例。 */
+.compactTabs {
+  display: none;
+  order: 1;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) minmax(0, 1fr);
+  align-items: end;
+  gap: 0;
+  margin-bottom: 1px;
+}
+
+.neighborTab,
+.currentTab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 46px;
+  padding: 10px 8px;
+  overflow-wrap: anywhere;
+}
+
+.neighborTab {
+  --tab-bg: var(--soft-bg);
+  min-height: 34px;
+  padding-block: 6px;
+  font-size: 12px;
+}
+
+/* 左右按鈕外側保留斜邊，與中央相接的內側改為直邊。 */
+.neighborTab:first-child::after {
+  transform: none;
+  border-top-right-radius: 0;
+  border-right: none;
+}
+
+.neighborTab:last-child::before {
+  transform: none;
+  border-top-left-radius: 0;
+  border-left: none;
+}
+
+.neighborTab:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.currentTab {
+  min-height: 40px;
+  padding-block: 7px;
+  font-weight: 700;
+  cursor: default;
+  --tab-bg: var(--surface);
+  --tab-border: var(--tab-bg);
+  color: var(--chart-gray);
+}
+
+/* 使用單片圓角梯形背景，保留目前頁籤的左右斜邊。 */
+.currentTab::before {
+  width: 100%;
+  transform: none;
+  border: none;
+  border-radius: 0;
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 46' preserveAspectRatio='none'%3E%3Cpath fill='white' d='M0 46 3 10Q4 0 14 0H286Q296 0 297 10L300 46Z'/%3E%3C/svg%3E");
+  mask-size: 100% 100%;
+  mask-repeat: no-repeat;
+}
+
+.currentTab::after {
+  display: none;
+}
+
+.currentTab[data-rank="0"] {
+  color: var(--primary);
+}
+
+.currentTab[data-rank="1"] {
+  color: var(--accent);
+}
+
+.languageOverview[data-compact="true"] .languageTabs {
+  display: none;
+}
+
+.languageOverview[data-compact="true"] .compactTabs {
+  display: grid;
+}
+
+.languageOverview[data-compact="true"] .languageTrack {
+  height: 28px;
+  /* 圓角延伸至下方白底外側，避免內縮白底的視覺寬度。 */
+  margin-inline: -1px;
+  border-radius: 2px;
+}
+
+.languageOverview[data-compact="true"] .segmentPercentage[data-visible="true"] {
+  display: inline;
 }
 
 /* 選取狀態沿用目前配色 */
@@ -395,8 +513,8 @@
   }
 }
 
-/* 中小螢幕：頁籤等寬，名稱與百分比分兩行 */
-@media (max-width: 900px) {
+/* 單行放不下時先分兩行，不以固定螢幕寬度切換。 */
+.languageOverview[data-stacked="true"] {
   .languageTabLabel {
     padding: 12px 4px 6px;
     white-space: normal;
@@ -443,14 +561,10 @@
   }
 }
 
-/* 窄手機：縮小留白，語言頁籤等寬 */
+/* 窄手機：縮小留白 */
 @media (max-width: 440px) {
   .card {
     padding: 20px 12px;
-  }
-
-  .languageTab {
-    flex: 1 1 0 !important;
   }
 }
 
