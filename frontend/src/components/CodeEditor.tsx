@@ -102,6 +102,7 @@ export default function CodeEditor({
   const extensions = useMemo(
     () => [
       looksLikeHtml ? html() : looksLikeCss ? css() : python(),
+      EditorView.lineWrapping,
       syntaxHighlighting(editorHighlightStyle),
       indentUnit.of("    "),
       EditorView.contentAttributes.of({
