@@ -82,6 +82,16 @@ class HTMLEmbeddedCodeParser(HTMLParser):
         self.current_block = None
 
     def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+        inline_style = attributes.get("style")
+        if inline_style and inline_style.strip():
+            self.blocks.append({
+                "language": "css",
+                "code": inline_style,
+                "mode": "declarations",
+                "line": self.getpos()[0],
+                "column": None,
+            })
         if tag not in {"style", "script"}:
             return
 
@@ -117,7 +127,17 @@ class HTMLEmbeddedCodeParser(HTMLParser):
             "tag": tag,
             "language": language,
             "parts": [],
+            "line": self.getpos()[0] + self.get_starttag_text().count("\n"),
+            "column": (
+                self.getpos()[1] + len(self.get_starttag_text())
+                if "\n" not in self.get_starttag_text()
+                else len(self.get_starttag_text().rsplit("\n", 1)[1])
+            ),
         }
+
+    def handle_startendtag(self, tag, attrs):
+        self.handle_starttag(tag, attrs)
+        self.handle_endtag(tag)
 
     def handle_data(self, data):
         if self.current_block is not None:
@@ -137,6 +157,9 @@ class HTMLEmbeddedCodeParser(HTMLParser):
                 {
                     "language": self.current_block["language"],
                     "code": code,
+                    "mode": "stylesheet",
+                    "line": self.current_block["line"],
+                    "column": self.current_block["column"],
                 }
             )
 

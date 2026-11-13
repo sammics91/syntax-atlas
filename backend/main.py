@@ -9,10 +9,16 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from analyzer import analyze_python
+from analyzer_css import (
+    CSSValidationError,
+    CSSValidationServiceError,
+    analyze_css,
+)
 from analyzer_html import (
     HTMLValidationError,
     HTMLValidationServiceError,
     analyze_html,
+    extract_embedded_code,
 )
 from auth import router as auth_router
 from bookmarks import router as bookmarks_router
@@ -40,9 +46,9 @@ app.include_router(password_reset_router)
 app.include_router(records_router)
 app.include_router(statistics_router)
 
-# 分析請求的資料格式，目前先支援 Python / HTML
+# 分析請求的資料格式，支援 Python、HTML 與 CSS。
 class AnalysisRequest(BaseModel):
-    language: Literal["python", "html"] | None = None
+    language: Literal["python", "html", "css"] | None = None
     code: str = Field(min_length=1, max_length=20000)
 
     # 自動判斷完整 HTML 文件或片段，也允許明確指定模式。
@@ -56,6 +62,7 @@ class AnalysisRequest(BaseModel):
 ANALYZERS = {
     "python": analyze_python,
     "html": analyze_html,
+    "css": analyze_css,
 }
 
 # 未指定語言時，先判斷程式碼適合交給哪個分析器。
@@ -77,6 +84,11 @@ def detect_language(code: str) -> str:
         flags=re.IGNORECASE,
     ):
         return "html"
+
+    # 樣式區塊或 At-rule 交給 CSS 分析器驗證，不直接認定合法。
+    css_candidate = re.sub(r"/\*.*?\*/", "", code, flags=re.DOTALL).lstrip()
+    if "{" in css_candidate or re.match(r"@[a-z-]+", css_candidate, re.IGNORECASE):
+        return "css"
 
     raise HTTPException(
         status_code=400,
@@ -111,6 +123,39 @@ def build_language_stats(syntaxes):
 
     return language_stats, total_usage_count
 
+
+def analyze_html_with_css(code, *, mode="auto", context="div"):
+    """HTML 驗證通過後，分析實際寫出的樣式；相同語法合併次數。"""
+    syntaxes = analyze_html(code, mode=mode, context=context)
+    for block in extract_embedded_code(code):
+        if block["language"] != "css":
+            continue
+        try:
+            syntaxes.extend(analyze_css(block["code"], mode=block["mode"]))
+        except CSSValidationError as error:
+            errors = []
+            for detail in error.errors:
+                local_line = detail.get("line")
+                column = detail.get("column")
+                if block["mode"] == "declarations":
+                    # 屬性值經 HTML 字元解碼，不能假裝欄位仍精準對應原文。
+                    line, column = block["line"], None
+                else:
+                    line = block["line"] + local_line - 1 if local_line else None
+                    if local_line == 1 and column is not None:
+                        column += block["column"]
+                errors.append({**detail, "language": "css", "line": line, "column": column})
+            raise CSSValidationError(errors) from error
+
+    merged = {}
+    for syntax in syntaxes:
+        key = (syntax["language"], syntax["syntax_id"])
+        if key not in merged:
+            merged[key] = dict(syntax)
+        else:
+            merged[key]["count"] += syntax["count"]
+    return sorted(merged.values(), key=lambda item: (-item["count"], item["name"], item["syntax_id"]))
+
 # POST /api/analyses：分析程式碼
 @app.post("/api/analyses")
 def create_analysis(request: AnalysisRequest):
@@ -131,7 +176,7 @@ def create_analysis(request: AnalysisRequest):
 
     try:
         if language == "html":
-            syntaxes = analyzer(
+            syntaxes = analyze_html_with_css(
                 request.code,
                 mode=request.html_mode,
                 context=request.html_context,
@@ -139,9 +184,8 @@ def create_analysis(request: AnalysisRequest):
         else:
             syntaxes = analyzer(request.code)
 
-    # HTMLValidationError 繼承 SyntaxError，
-    # 必須放在一般 SyntaxError 前面，才能保留全部錯誤。
-    except HTMLValidationError as error:
+    # HTML、CSS 驗證錯誤先處理，保留完整錯誤清單。
+    except (HTMLValidationError, CSSValidationError) as error:
         return {
             "language": language,
             "valid": False,
@@ -164,7 +208,7 @@ def create_analysis(request: AnalysisRequest):
         }
 
     # 驗證器無法連線屬於服務問題，不當成使用者的語法錯誤。
-    except HTMLValidationServiceError as error:
+    except (HTMLValidationServiceError, CSSValidationServiceError) as error:
         raise HTTPException(
             status_code=503,
             detail=str(error),
@@ -185,7 +229,7 @@ def create_analysis(request: AnalysisRequest):
 # GET /api/syntaxes：取得語法辭典
 @app.get("/api/syntaxes")
 def get_syntaxes(
-    language: Literal["python", "html"] | None = None,
+    language: Literal["python", "html", "css"] | None = None,
 ):
     connection = get_db_connection()
 
