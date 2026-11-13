@@ -2,10 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 
 import { useAuth } from "@/components/AuthProvider";
 
 import styles from "./page.module.css";
+
+// 只在展開語法說明時載入唯讀範例。
+const CodeExample = dynamic(() => import("@/components/CodeExample"), {
+  ssr: false,
+  loading: () => <p role="status">正在載入範例…</p>,
+});
 
 type StatisticsLanguage = "python" | "html" | "css";
 
@@ -484,10 +491,10 @@ export default function StatisticsPage() {
 
                           <p>{syntax.summary}</p>
 
-                          {syntax.example_code && (
-                            <pre>
-                              <code>{syntax.example_code}</code>
-                            </pre>
+                          {isExpanded && syntax.example_code && (
+                            <div className={styles.codeExample}>
+                              <CodeExample value={syntax.example_code} />
+                            </div>
                           )}
                         </div>
                       </div>

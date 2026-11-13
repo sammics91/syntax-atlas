@@ -381,18 +381,16 @@
   line-height: 1.8;
 }
 
-.syntaxDetails pre {
+.codeExample {
   margin: 16px 0 0;
-  overflow-x: auto;
-  font-family: Consolas, "Courier New", monospace;
-  font-size: 14px;
-  line-height: 1.7;
+  min-width: 0;
+  max-width: 100%;
 }
 
 /* 解釋與範例向右縮排，標題位置不變 */
 @media (min-width: 1200px) {
   .syntaxDetails > p,
-  .syntaxDetails > pre {
+  .syntaxDetails > .codeExample {
     margin-left: 30px;
   }
 }
@@ -412,7 +410,7 @@
   }
 }
 
-/* 手機版 */
+/* 行動裝置 */
 @media (max-width: 640px) {
   .empty {
     margin-top: 24px;

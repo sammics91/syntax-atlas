@@ -106,6 +106,7 @@
 /*-- 語言標題 --*/
 .dictionary {
   margin-top: 30px;
+  container-type: inline-size;
 }
 
 /* 語言頁籤與收藏篩選 */
@@ -283,15 +284,29 @@
   flex-shrink: 0;
 }
 
+/* 所有寬度皆保留中英文分組，空間不足時中文整組換行。 */
 .name {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  overflow-wrap: anywhere;
+}
+
+.englishName,
+.displayLabel {
+  flex: 0 0 auto;
+  width: max-content;
+  display: inline-block;
+  max-width: 100%;
+  white-space: nowrap;
   overflow-wrap: anywhere;
 }
 
 /* 中文名稱預留空間，顯示時不推動右側使用狀態 */
 .displayLabel {
-  margin-left: 1em;
   opacity: 0;
 }
 
@@ -366,12 +381,13 @@
   line-height: 1.8;
 }
 
-.explanation pre {
+.codeExample {
   margin: 20px 0 0;
-  overflow-x: auto;
-  font-family: Consolas, "Courier New", monospace;
-  line-height: 1.7;
+  min-width: 0;
+  max-width: 100%;
 }
+
+/* 底色、單色文字與續行縮排由 CodeExample 元件處理。 */
 
 /* 範例下方的官方文件連結 */
 .sourceLink {
@@ -386,7 +402,7 @@
   outline-offset: 3px;
 }
 
-/*-- 手機版 --*/
+/*-- 行動裝置 --*/
 @media (max-width: 640px) {
   .summary {
     gap: 8px 16px;
@@ -430,24 +446,7 @@
     font-size: var(--placeholder-size, 1em);
   }
 
-  /* 完整英文與中文各自成組，空間不夠時中文整組換到下一行。 */
-  .name {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 2px 10px;
-  }
-
-  .englishName,
   .displayLabel {
-    display: inline-block;
-    max-width: 100%;
-    white-space: nowrap;
-    overflow-wrap: anywhere;
-  }
-
-  .displayLabel {
-    margin-left: 0;
     opacity: 1;
   }
 
@@ -485,6 +484,23 @@
     justify-content: flex-start;
     padding: 12px 16px;
     border-radius: 4px;
+    background: var(--surface);
+  }
+}
+
+/* 依辭典內容寬度排列；側欄占用空間時，收藏工具列也有連續白底。 */
+@container (max-width: 680px) {
+  .summary {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+
+  .bookmarkFilter {
+    width: 100%;
+    justify-content: flex-start;
+    padding: 12px 16px;
+    border-radius: 4px 4px 0 0;
     background: var(--surface);
   }
 }

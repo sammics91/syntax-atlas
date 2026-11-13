@@ -1,11 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 
 import AuthDialog from "@/components/AuthDialog";
 import { useAuth } from "@/components/AuthProvider";
 
 import styles from "./page.module.css";
+
+// 只在展開範例時載入唯讀編輯器。
+const CodeExample = dynamic(() => import("@/components/CodeExample"), {
+  ssr: false,
+  loading: () => <p role="status">正在載入範例…</p>,
+});
 
 type DictionaryLanguage = "python" | "html" | "css";
 
@@ -37,20 +44,21 @@ type MemberBookmarks = {
   error: boolean;
 };
 
-// 窄手機先以完整名稱換行；單個名稱太長時才縮字，最小保留 12px。
+// 所有螢幕寬度皆以完整名稱換行；單個名稱太長時才縮字，最小保留 12px。
 function DictionaryName({
   syntax,
   hasUsed,
+  isExpanded,
 }: {
   syntax: SyntaxEntry;
   hasUsed: boolean;
+  isExpanded: boolean;
 }) {
   const nameRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     const element = nameRef.current;
     if (!element) return;
-    const narrow = window.matchMedia("(max-width: 440px)");
     let active = true;
     function fit() {
       if (!active || !element) return;
@@ -59,7 +67,7 @@ function DictionaryName({
       for (const child of Array.from(element.children) as HTMLElement[]) {
         child.style.removeProperty("font-size");
         child.style.removeProperty("white-space");
-        if (!narrow.matches || width <= 0) continue;
+        if (width <= 0) continue;
         const needed = child.scrollWidth;
         if (needed > width) {
           child.style.fontSize = `${Math.max(12, Math.floor((baseSize * width) / needed))}px`;
@@ -70,15 +78,13 @@ function DictionaryName({
     }
     const observer = new ResizeObserver(fit);
     observer.observe(element);
-    narrow.addEventListener("change", fit);
     void document.fonts.ready.then(fit);
     fit();
     return () => {
       active = false;
       observer.disconnect();
-      narrow.removeEventListener("change", fit);
     };
-  }, [syntax.name, syntax.display_label, hasUsed]);
+  }, [syntax.name, syntax.display_label, hasUsed, isExpanded]);
 
   return (
     <span
@@ -774,7 +780,11 @@ export default function DictionaryPage() {
                           );
                         }}
                       >
-                        <DictionaryName syntax={syntax} hasUsed={hasUsed} />
+                        <DictionaryName
+                          syntax={syntax}
+                          hasUsed={hasUsed}
+                          isExpanded={isExpanded}
+                        />
 
                         {!isAuthLoading && user && (
                           <span
@@ -819,9 +829,11 @@ export default function DictionaryPage() {
                         <h3>語法解釋：</h3>
                         <p>{syntax.summary}</p>
 
-                        <pre>
-                          <code>{syntax.example_code}</code>
-                        </pre>
+                        {isExpanded && syntax.example_code && (
+                          <div className={styles.codeExample}>
+                            <CodeExample value={syntax.example_code} />
+                          </div>
+                        )}
                         {syntax.source_url?.startsWith("https://") && (
                           <a
                             className={styles.sourceLink}

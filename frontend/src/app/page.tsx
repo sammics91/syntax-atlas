@@ -15,6 +15,12 @@ const CodeEditor = dynamic(() => import("@/components/CodeEditor"), {
   loading: () => <p role="status">正在載入編輯器…</p>,
 });
 
+// 分析結果展開時才載入唯讀範例，不影響首頁輸入編輯器。
+const CodeExample = dynamic(() => import("@/components/CodeExample"), {
+  ssr: false,
+  loading: () => <p role="status">正在載入範例…</p>,
+});
+
 // 首頁支援的語言與顯示名稱。
 const LANGUAGE_LABELS = {
   python: "Python",
@@ -52,6 +58,52 @@ type AnalysisResult = {
   syntaxes: SyntaxResult[];
   errors: AnalysisError[];
 };
+
+// 所有螢幕寬度皆以完整名稱換行；單個名稱太長時才縮字，最小保留 12px。
+function HomeSyntaxName({ syntax }: { syntax: SyntaxResult }) {
+  const nameRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    const element = nameRef.current;
+    if (!element) return;
+    let active = true;
+    function fit() {
+      if (!active || !element) return;
+      const width = element.clientWidth;
+      const baseSize = parseFloat(getComputedStyle(element).fontSize);
+      for (const child of Array.from(element.children) as HTMLElement[]) {
+        child.style.removeProperty("font-size");
+        child.style.removeProperty("white-space");
+        if (width <= 0) continue;
+        const needed = child.scrollWidth;
+        if (needed > width) {
+          child.style.fontSize = `${Math.max(12, Math.floor((baseSize * width) / needed))}px`;
+          // 極長名稱不再縮小，改以換行保留完整文字。
+          if (child.scrollWidth > width) child.style.whiteSpace = "normal";
+        }
+      }
+    }
+    const observer = new ResizeObserver(fit);
+    observer.observe(element);
+    void document.fonts.ready.then(fit);
+    fit();
+    return () => {
+      active = false;
+      observer.disconnect();
+    };
+  }, [syntax.name, syntax.display_label]);
+
+  return (
+    <span ref={nameRef} className={styles.syntaxName}>
+      <span className={styles.syntaxEnglishName}>{syntax.name}</span>
+      {syntax.display_label && syntax.display_label !== syntax.name && (
+        <span className={styles.syntaxDisplayLabel}>
+          · {syntax.display_label}
+        </span>
+      )}
+    </span>
+  );
+}
 
 export default function HomePage() {
   return (
@@ -598,16 +650,7 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
                         );
                       }}
                     >
-                      <span className={styles.syntaxName}>
-                        {syntax.name}
-                        {syntax.display_label &&
-                          syntax.display_label !== syntax.name && (
-                            <span>
-                              {"　· "}
-                              {syntax.display_label}
-                            </span>
-                          )}
-                      </span>
+                      <HomeSyntaxName syntax={syntax} />
 
                       <span className={styles.syntaxCount}>
                         {syntax.count} 次
@@ -628,9 +671,11 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
                       <h3>語法解釋</h3>
                       <p>{syntax.summary}</p>
 
-                      <pre>
-                        <code>{syntax.example_code}</code>
-                      </pre>
+                      {isExpanded && syntax.example_code && (
+                        <div className={styles.codeExample}>
+                          <CodeExample value={syntax.example_code} />
+                        </div>
+                      )}
                     </div>
                   </li>
                 );

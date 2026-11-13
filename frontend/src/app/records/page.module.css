@@ -314,6 +314,8 @@
 
 /* 程式碼預覽 */
 .codePreview {
+  min-width: 0;
+  max-width: 100%;
   max-height: 220px;
   margin: 0;
   padding: 24px;
@@ -325,11 +327,12 @@
   font-family: Consolas, monospace;
   font-size: 15px;
   line-height: 1.6;
-  white-space: pre;
+  white-space: normal;
 }
 
-.codePreview code {
-  font: inherit;
+/* 預覽是編輯連結的一部分，點擊由外層連結處理。 */
+.recordEditLink .codePreview :global(.cm-editor) {
+  pointer-events: none;
 }
 
 /* 手機版 */
