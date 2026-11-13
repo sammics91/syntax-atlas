@@ -207,8 +207,25 @@ function SiteShellContent({ children }: { children: ReactNode }) {
                 onClick={() => setIsProfileOpen(true)}
                 disabled={isSigningOut}
                 aria-haspopup="dialog"
+                aria-label={`開啟 ${user.name} 的會員資訊`}
               >
-                {user.name}
+                <span className="profile-name">{user.name}</span>
+
+                <svg
+                  className="profile-icon"
+                  viewBox="0 0 24 24"
+                  width="22"
+                  height="22"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="8" r="4" />
+                  <path d="M5 21v-2a7 7 0 0 1 14 0v2" />
+                </svg>
               </button>
             ) : (
               <span
@@ -224,19 +241,9 @@ function SiteShellContent({ children }: { children: ReactNode }) {
                 type="button"
                 className="login-button"
                 disabled={isSigningOut}
-                onClick={() => {
-                  if (window.matchMedia("(max-width: 440px)").matches) {
-                    setIsProfileOpen(true);
-                  } else {
-                    void signout();
-                  }
-                }}
+                onClick={() => void signout()}
               >
-                <span className="account-label-desktop">
-                  {isSigningOut ? "登出中…" : "登出"}
-                </span>
-
-                <span className="account-label-mobile">{user.name}</span>
+                {isSigningOut ? "登出中…" : "登出"}
               </button>
             ) : (
               <button

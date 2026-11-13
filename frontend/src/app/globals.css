@@ -151,6 +151,11 @@ textarea::placeholder {
   cursor: default;
 }
 
+/* 一般畫面顯示會員名稱，隱藏人像圖示 */
+.profile-icon {
+  display: none;
+}
+
 .login-button {
   flex-shrink: 0;
   padding: 9px 16px 7px;
@@ -374,10 +379,35 @@ textarea::placeholder {
     display: none;
   }
 
+  .site-account {
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* 隱藏訪客文字 */
   .account-name {
     display: none;
   }
 
+  /* 會員資訊按鈕：顯示人像圖示 */
+  .account-profile-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+  }
+
+  .profile-name {
+    display: none;
+  }
+
+  .profile-icon {
+    display: block;
+  }
+
+  /* 未登入時，登入／註冊簡化成登入 */
   .account-label-desktop {
     display: none;
   }
