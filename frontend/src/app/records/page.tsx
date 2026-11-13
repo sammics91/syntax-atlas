@@ -261,7 +261,9 @@ export default function RecordsPage() {
                   ? "Python"
                   : record.language === "html"
                     ? "HTML"
-                    : record.language}
+                    : record.language === "css"
+                      ? "CSS"
+                      : record.language}
                 {" · "}
                 {record.created_at.slice(0, 10).replaceAll("-", "/")}
                 {" · "}
