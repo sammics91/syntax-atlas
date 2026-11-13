@@ -7,7 +7,7 @@ import { useAuth } from "@/components/AuthProvider";
 
 import styles from "./page.module.css";
 
-type DictionaryLanguage = "python" | "html";
+type DictionaryLanguage = "python" | "html" | "css";
 
 const DICTIONARY_LANGUAGES: {
   value: DictionaryLanguage;
@@ -15,6 +15,7 @@ const DICTIONARY_LANGUAGES: {
 }[] = [
   { value: "python", label: "Python" },
   { value: "html", label: "HTML" },
+  { value: "css", label: "CSS" },
 ];
 
 type SyntaxEntry = {
@@ -305,7 +306,7 @@ export default function DictionaryPage() {
     ? syntaxes.filter((syntax) => currentBookmarks?.ids.includes(syntax.id))
     : syntaxes;
 
-  // 先跨語言搜尋；相同符合程度時，Python 優先，再依辭典排序。
+  // 先跨語言搜尋；相同符合程度時，依 Python、HTML、CSS 頁籤順序，再依辭典排序。
   const rankedSyntaxes = sourceSyntaxes
     .map((syntax) => ({
       syntax,
@@ -339,6 +340,7 @@ export default function DictionaryPage() {
       .length,
     html: matchingSyntaxes.filter((syntax) => syntax.language === "html")
       .length,
+    css: matchingSyntaxes.filter((syntax) => syntax.language === "css").length,
   };
 
   // 列表只顯示目前語言，保留上面已完成的搜尋排序。
@@ -608,13 +610,14 @@ export default function DictionaryPage() {
                   Boolean(
                     user && (!currentBookmarks || currentBookmarks.error),
                   );
-                const isExpanded = expandedSlug === syntax.slug;
-                const buttonId = `dictionary-button-${syntax.slug}`;
-                const panelId = `dictionary-panel-${syntax.slug}`;
+                const syntaxKey = `${syntax.language}-${syntax.slug}`;
+                const isExpanded = expandedSlug === syntaxKey;
+                const buttonId = `dictionary-button-${syntaxKey}`;
+                const panelId = `dictionary-panel-${syntaxKey}`;
 
                 return (
                   <li
-                    key={syntax.slug}
+                    key={syntaxKey}
                     className={`${styles.item} ${
                       isExpanded ? styles.expanded : ""
                     }`}
@@ -658,7 +661,7 @@ export default function DictionaryPage() {
                         aria-controls={panelId}
                         onClick={() => {
                           setExpandedSlug((current) =>
-                            current === syntax.slug ? null : syntax.slug,
+                            current === syntaxKey ? null : syntaxKey,
                           );
                         }}
                       >

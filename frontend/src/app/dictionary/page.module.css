@@ -443,8 +443,18 @@
   }
 
   .languageTabs {
+    /* 三個語言頁籤同列顯示，避免窄手機換行或超出畫面。 */
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0;
     padding-inline: 8px;
+  }
+
+  .languageTab {
+    min-width: 0;
+    gap: 2px;
+    padding-inline: 4px;
+    font-size: clamp(12px, 3.5vw, 14px);
   }
 
   .bookmarkFilter {
