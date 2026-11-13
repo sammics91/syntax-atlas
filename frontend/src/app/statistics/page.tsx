@@ -353,7 +353,10 @@ export default function StatisticsPage() {
                       }}
                     >
                       <span className={styles.languageTabLabel}>
-                        {language.label} {percentage}%
+                        <span>{language.label}</span>{" "}
+                        <span className={styles.languagePercentage}>
+                          {percentage}%
+                        </span>
                       </span>
                     </button>
                   );

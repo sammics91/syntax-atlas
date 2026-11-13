@@ -397,6 +397,21 @@
   }
 }
 
+/* 中小螢幕：頁籤等寬，名稱與百分比分兩行 */
+@media (max-width: 900px) {
+  .languageTabLabel {
+    padding: 12px 4px 6px;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    line-height: 1.2;
+  }
+
+  .languagePercentage {
+    display: block;
+  }
+}
+
 /* 手機版 */
 @media (max-width: 640px) {
   .empty {
@@ -410,7 +425,7 @@
   }
 
   .section {
-    padding: 20px 16px;
+    padding: 0;
   }
 
   .card {
@@ -427,6 +442,17 @@
 
   .count {
     font-size: 14px;
+  }
+}
+
+/* 窄手機：縮小留白，語言頁籤等寬 */
+@media (max-width: 440px) {
+  .card {
+    padding: 20px 12px;
+  }
+
+  .languageTab {
+    flex: 1 1 0 !important;
   }
 }
 
