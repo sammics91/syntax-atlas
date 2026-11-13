@@ -7,7 +7,7 @@ import { useAuth } from "@/components/AuthProvider";
 
 import styles from "./page.module.css";
 
-type StatisticsLanguage = "python" | "html";
+type StatisticsLanguage = "python" | "html" | "css";
 
 const STATISTICS_LANGUAGES: {
   value: StatisticsLanguage;
@@ -15,6 +15,7 @@ const STATISTICS_LANGUAGES: {
 }[] = [
   { value: "python", label: "Python" },
   { value: "html", label: "HTML" },
+  { value: "css", label: "CSS" },
 ];
 
 type SyntaxUsage = {
@@ -199,7 +200,7 @@ export default function StatisticsPage() {
       percentage: (language.count / totalCount) * 100,
     }));
 
-  // 若會員只有 HTML 紀錄，直接選取 HTML。
+  // 未手動選取時，顯示使用次數最多的語言；也適用僅有 HTML 或 CSS 的會員。
   const activeLanguage = languageTabs.some(
     (language) => language.value === selectedLanguage,
   )

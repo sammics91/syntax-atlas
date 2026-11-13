@@ -12,7 +12,7 @@ router = APIRouter(prefix="/api", tags=["常用語法"])
 # 取得目前會員已儲存的語法累積使用次數。
 @router.get("/statistics")
 def get_statistics(
-    language: Literal["python", "html", "all"] = "python",
+    language: Literal["python", "html", "css", "all"] = "python",
     user: dict = Depends(get_current_user),
 ):
     connection = get_db_connection()
@@ -57,17 +57,27 @@ def get_statistics(
             rows = cursor.fetchall()
 
             # 紀錄筆數包含「已刪除程式碼、保留統計」的紀錄。
+            # 指定語言時，也包含 HTML 紀錄中實際使用該語言的內嵌樣式。
             cursor.execute(
                 """
                 SELECT COUNT(*) AS record_count
-                FROM records
-                WHERE user_id = %s
+                FROM records AS r
+                WHERE r.user_id = %s
                   AND (
                       %s = 'all'
-                      OR language = %s
+                      OR r.language = %s
+                      OR EXISTS (
+                          SELECT 1
+                          FROM record_syntax_usage AS rsu
+                          JOIN syntaxes AS s ON s.id = rsu.syntax_id
+                          JOIN syntax_categories AS c ON c.id = s.category_id
+                          WHERE rsu.record_id = r.id
+                            AND c.language = %s
+                            AND rsu.usage_count > 0
+                      )
                   )
                 """,
-                (user["id"], language, language),
+                (user["id"], language, language, language),
             )
 
             record_count = cursor.fetchone()["record_count"]
