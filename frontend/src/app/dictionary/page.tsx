@@ -37,6 +37,62 @@ type MemberBookmarks = {
   error: boolean;
 };
 
+// 窄手機先以完整名稱換行；單個名稱太長時才縮字，最小保留 12px。
+function DictionaryName({
+  syntax,
+  hasUsed,
+}: {
+  syntax: SyntaxEntry;
+  hasUsed: boolean;
+}) {
+  const nameRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    const element = nameRef.current;
+    if (!element) return;
+    const narrow = window.matchMedia("(max-width: 440px)");
+    let active = true;
+    function fit() {
+      if (!active || !element) return;
+      const width = element.clientWidth;
+      const baseSize = parseFloat(getComputedStyle(element).fontSize);
+      for (const child of Array.from(element.children) as HTMLElement[]) {
+        child.style.removeProperty("font-size");
+        child.style.removeProperty("white-space");
+        if (!narrow.matches || width <= 0) continue;
+        const needed = child.scrollWidth;
+        if (needed > width) {
+          child.style.fontSize = `${Math.max(12, Math.floor((baseSize * width) / needed))}px`;
+          // 極長名稱不再縮小，改以換行保留完整文字。
+          if (child.scrollWidth > width) child.style.whiteSpace = "normal";
+        }
+      }
+    }
+    const observer = new ResizeObserver(fit);
+    observer.observe(element);
+    narrow.addEventListener("change", fit);
+    void document.fonts.ready.then(fit);
+    fit();
+    return () => {
+      active = false;
+      observer.disconnect();
+      narrow.removeEventListener("change", fit);
+    };
+  }, [syntax.name, syntax.display_label, hasUsed]);
+
+  return (
+    <span
+      ref={nameRef}
+      className={`${styles.name} ${hasUsed ? styles.usedName : ""}`}
+    >
+      <span className={styles.englishName}>{syntax.name}</span>
+      {syntax.display_label && syntax.display_label !== syntax.name && (
+        <span className={styles.displayLabel}>· {syntax.display_label}</span>
+      )}
+    </span>
+  );
+}
+
 // 搜尋時忽略大小寫、全半形與排版空白
 function normalizeSearch(text: string) {
   return text.normalize("NFKC").toLowerCase().replace(/\s+/g, "");
@@ -113,6 +169,7 @@ function compareDictionaryEntries(a: SyntaxEntry, b: SyntaxEntry) {
 }
 
 export default function DictionaryPage() {
+  const searchRef = useRef<HTMLInputElement>(null);
   const { user, isAuthLoading, authError, completeSignin } = useAuth();
   const [syntaxes, setSyntaxes] = useState<SyntaxEntry[]>([]);
   const [expandedSlug, setExpandedSlug] = useState<string | null>(null);
@@ -143,6 +200,57 @@ export default function DictionaryPage() {
   const [isBookmarkAuthOpen, setIsBookmarkAuthOpen] = useState(false);
 
   const bookmarkSavingRef = useRef(false);
+
+  // 依搜尋框實際可用寬度調整提示字級，不縮小使用者輸入的文字。
+  useEffect(() => {
+    const input = searchRef.current;
+    if (!input) return;
+    const fullPlaceholder = input.placeholder;
+    const narrow = window.matchMedia("(max-width: 440px)");
+    const context = document.createElement("canvas").getContext("2d");
+    let active = true;
+    function fitPlaceholder() {
+      if (!active || !input || !context) return;
+      input.style.removeProperty("--placeholder-size");
+      input.placeholder = fullPlaceholder;
+      if (!narrow.matches) return;
+      const style = getComputedStyle(input);
+      const width =
+        input.clientWidth -
+        parseFloat(style.paddingLeft) -
+        parseFloat(style.paddingRight);
+      const baseSize = parseFloat(style.fontSize);
+      context.font = `${style.fontWeight} ${baseSize}px ${style.fontFamily}`;
+      // 最小字級仍放不下時縮短提示，完整搜尋用途仍由輸入框標籤說明。
+      for (const candidate of [
+        fullPlaceholder,
+        "搜尋語法、中文或關鍵字",
+        "搜尋語法",
+      ]) {
+        input.placeholder = candidate;
+        const neededAtMinimum =
+          (context.measureText(candidate).width * 12) / baseSize;
+        if (neededAtMinimum <= width) break;
+      }
+      const needed = context.measureText(input.placeholder).width;
+      if (needed > width && width > 0) {
+        input.style.setProperty(
+          "--placeholder-size",
+          `${Math.max(12, Math.floor((baseSize * width) / needed))}px`,
+        );
+      }
+    }
+    const observer = new ResizeObserver(fitPlaceholder);
+    observer.observe(input);
+    narrow.addEventListener("change", fitPlaceholder);
+    void document.fonts.ready.then(fitPlaceholder);
+    fitPlaceholder();
+    return () => {
+      active = false;
+      observer.disconnect();
+      narrow.removeEventListener("change", fitPlaceholder);
+    };
+  }, []);
 
   // 只使用目前會員的收藏，避免切換帳號時顯示別人的資料
   const currentBookmarks =
@@ -445,6 +553,7 @@ export default function DictionaryPage() {
       >
         <div className={styles.searchRow}>
           <input
+            ref={searchRef}
             id="syntax-search"
             type="text"
             enterKeyHint="search"
@@ -665,35 +774,33 @@ export default function DictionaryPage() {
                           );
                         }}
                       >
-                        <span
-                          className={`${styles.name} ${
-                            hasUsed ? styles.usedName : ""
-                          }`}
-                        >
-                          {syntax.name}
-
-                          {syntax.display_label &&
-                            syntax.display_label !== syntax.name && (
-                              <span className={styles.displayLabel}>
-                                {"　· "}
-                                {syntax.display_label}
-                              </span>
-                            )}
-                        </span>
+                        <DictionaryName syntax={syntax} hasUsed={hasUsed} />
 
                         {!isAuthLoading && user && (
                           <span
                             className={`${styles.usage} ${
-                              hasUsed ? styles.usedUsage : ""
+                              hasUsed
+                                ? styles.usedUsage
+                                : currentUsage && !currentUsage.error
+                                  ? styles.unusedUsage
+                                  : ""
                             }`}
                           >
-                            {!currentUsage
-                              ? "載入中…"
-                              : currentUsage.error
-                                ? "次數載入失敗"
-                                : hasUsed
-                                  ? `✓ 已使用 ${usageCount} 次`
-                                  : "○ 尚未使用"}
+                            {!currentUsage ? (
+                              "載入中…"
+                            ) : currentUsage.error ? (
+                              "次數載入失敗"
+                            ) : hasUsed ? (
+                              <>
+                                ✓ 已使用
+                                <span className={styles.usageCount}>
+                                  {" "}
+                                  {usageCount} 次
+                                </span>
+                              </>
+                            ) : (
+                              "○ 尚未使用"
+                            )}
                           </span>
                         )}
 

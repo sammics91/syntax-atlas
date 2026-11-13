@@ -1,6 +1,6 @@
 /*-- 搜尋欄 --*/
 .search {
-  width: 100%;
+  width: calc(100% - 18px);
   max-width: 620px;
   margin: 24px 9px 0;
 }
@@ -53,10 +53,6 @@
   font-size: 14px;
   white-space: nowrap;
   cursor: pointer;
-}
-
-.clearSearch:hover {
-  background: var(--soft-bg);
 }
 
 .submitSearch {
@@ -160,10 +156,6 @@
   transform-origin: bottom;
 }
 
-.languageTab:hover {
-  color: var(--primary);
-}
-
 .languageTabActive {
   color: var(--primary);
   font-weight: 700;
@@ -188,7 +180,6 @@
   cursor: pointer;
 }
 
-.bookmarkFilter:hover:not(:disabled),
 .bookmarkFilterActive {
   color: var(--primary);
 }
@@ -231,12 +222,6 @@
     box-shadow 150ms ease;
 }
 
-.item:hover {
-  z-index: 1;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgb(0 0 0 / 10%);
-}
-
 /* 收藏按鈕與語法標題並排 */
 .headingRow {
   display: flex;
@@ -267,7 +252,6 @@
 }
 
 /* 滑鼠移入與已收藏都使用亮金色 */
-.bookmarkButton:hover:not(:disabled),
 .bookmarkButton.bookmarked {
   color: var(--accent-light);
 }
@@ -307,10 +291,10 @@
 
 /* 中文名稱預留空間，顯示時不推動右側使用狀態 */
 .displayLabel {
+  margin-left: 1em;
   opacity: 0;
 }
 
-.row:hover .displayLabel,
 .row:focus-visible .displayLabel,
 .expanded .displayLabel {
   opacity: 1;
@@ -329,9 +313,6 @@
 }
 
 /* 未展開時，滑過整列才加深已使用次數的文字 */
-.item:not(.expanded):hover .usedUsage {
-  color: var(--text);
-}
 
 .row:focus-visible {
   outline: 2px solid var(--chart-gray);
@@ -356,7 +337,7 @@
   background: var(--primary);
 }
 
-.expanded .bookmarkButton:not(.bookmarked):not(:hover) {
+.expanded .bookmarkButton:not(.bookmarked) {
   color: var(--surface);
 }
 
@@ -435,6 +416,48 @@
 
 /* 窄螢幕：收藏篩選換到白底工具列 */
 @media (max-width: 440px) {
+  /* 窄手機收合時簡化狀態，展開後才顯示完整使用次數。 */
+  .unusedUsage,
+  .item:not(.expanded) .usageCount {
+    display: none;
+  }
+
+  .usage {
+    font-size: 12px;
+  }
+
+  .searchRow input::placeholder {
+    font-size: var(--placeholder-size, 1em);
+  }
+
+  /* 完整英文與中文各自成組，空間不夠時中文整組換到下一行。 */
+  .name {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 10px;
+  }
+
+  .englishName,
+  .displayLabel {
+    display: inline-block;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow-wrap: anywhere;
+  }
+
+  .displayLabel {
+    margin-left: 0;
+    opacity: 1;
+  }
+
+  .row {
+    gap: 8px;
+  }
+
+  .item {
+    transition: none;
+  }
   .summary {
     flex-direction: column;
     align-items: stretch;
@@ -479,6 +502,44 @@
 
 /* 滑鼠移入效果，排除窄手機 */
 @media (min-width: 441px) {
+  .clearSearch:hover {
+    background: var(--soft-bg);
+  }
+
+  .languageTab:hover,
+  .bookmarkFilter:hover:not(:disabled) {
+    color: var(--primary);
+  }
+
+  .item:hover {
+    z-index: 1;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgb(0 0 0 / 10%);
+  }
+
+  .bookmarkButton:hover:not(:disabled) {
+    color: var(--accent-light);
+  }
+
+  .row:hover .displayLabel {
+    opacity: 1;
+  }
+
+  .item:not(.expanded):hover .usedUsage {
+    color: var(--text);
+  }
+
+  /* 覆蓋上方展開狀態的白色圖示，保留桌機滑過的亮金色。 */
+  .expanded .bookmarkButton:hover:not(:disabled) {
+    color: var(--accent-light);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .item:hover {
+      transform: none;
+    }
+  }
+
   .sourceLink:hover {
     color: var(--accent-on-green);
     text-decoration: underline;
