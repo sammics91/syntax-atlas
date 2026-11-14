@@ -7,6 +7,8 @@ export const wrappedLineIndent = EditorView.decorations.compute(
     const lines = [];
     for (let number = 1; number <= state.doc.lines; number++) {
       const line = state.doc.line(number);
+      // 空白行不需要續行縮排，避免提示文字繼承負縮排而被行號遮住。
+      if (line.text.length === 0) continue;
       const whitespace = line.text.match(/^[\t ]*/)?.[0] ?? "";
       const columns = [...whitespace].reduce(
         (count, character) =>
