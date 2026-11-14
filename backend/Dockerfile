@@ -15,6 +15,7 @@ COPY main.py \
      database.py \
      analyzer.py \
      analyzer_html.py \
+     analyzer_css.py \
      auth.py \
      records.py \
      syntax_statistics.py \
