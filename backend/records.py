@@ -4,10 +4,15 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from analyzer import analyze_python
+from analyzer_css import (
+    CSSValidationError,
+    CSSValidationServiceError,
+    analyze_css,
+)
 from analyzer_html import (
     HTMLValidationError,
     HTMLValidationServiceError,
-    analyze_html,
+    analyze_html_with_css,
 )
 from auth import get_current_user
 from database import get_db_connection
@@ -16,25 +21,32 @@ from database import get_db_connection
 router = APIRouter(prefix="/api", tags=["程式碼紀錄"])
 
 
-# 儲存紀錄時接收的資料
+# 儲存紀錄時接收的資料，支援 Python、HTML 與 CSS。
 class RecordCreateRequest(BaseModel):
     title: str | None = Field(default=None, max_length=100)
-    language: Literal["python", "html"]
+    language: Literal["python", "html", "css"]
     code: str = Field(min_length=1, max_length=20000)
 
-# 新增與更新紀錄時，都由後端重新驗證並計算語法次數。
+# 新增與更新紀錄時，都由後端重新驗證並計算語法次數；HTML 包含內嵌 CSS。
 def analyze_record_code(request: RecordCreateRequest):
     try:
         if request.language == "html":
-            return analyze_html(request.code)
+            return analyze_html_with_css(request.code)
+
+        if request.language == "css":
+            return analyze_css(request.code)
 
         return analyze_python(request.code)
 
-    except HTMLValidationError as error:
+    except (HTMLValidationError, CSSValidationError) as error:
         raise HTTPException(
             status_code=400,
             detail={
-                "message": "HTML 語法有誤，無法儲存。",
+                "message": (
+                    "CSS 語法有誤，無法儲存。"
+                    if isinstance(error, CSSValidationError)
+                    else "HTML 語法有誤，無法儲存。"
+                ),
                 "errors": error.errors,
             },
         ) from error
@@ -54,7 +66,7 @@ def analyze_record_code(request: RecordCreateRequest):
             },
         ) from error
 
-    except HTMLValidationServiceError as error:
+    except (HTMLValidationServiceError, CSSValidationServiceError) as error:
         raise HTTPException(
             status_code=503,
             detail=str(error),

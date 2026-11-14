@@ -2,10 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 
 import { useAuth } from "@/components/AuthProvider";
 
 import styles from "./page.module.css";
+
+// 紀錄預覽沿用唯讀範例的單色文字、自動折行與續行縮排。
+const CodeExample = dynamic(() => import("@/components/CodeExample"), {
+  ssr: false,
+  loading: () => <p role="status">正在載入程式碼…</p>,
+});
 
 type CodeRecord = {
   id: number;
@@ -261,7 +268,9 @@ export default function RecordsPage() {
                   ? "Python"
                   : record.language === "html"
                     ? "HTML"
-                    : record.language}
+                    : record.language === "css"
+                      ? "CSS"
+                      : record.language}
                 {" · "}
                 {record.created_at.slice(0, 10).replaceAll("-", "/")}
                 {" · "}
@@ -279,9 +288,9 @@ export default function RecordsPage() {
                   aria-label={`編輯紀錄 #${record.record_number}`}
                   title="點擊編輯這份程式碼"
                 >
-                  <pre className={styles.codePreview}>
-                    <code>{record.code}</code>
-                  </pre>
+                  <div className={styles.codePreview}>
+                    <CodeExample value={record.code} />
+                  </div>
                 </Link>
               )}
             </article>

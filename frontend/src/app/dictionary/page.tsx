@@ -1,13 +1,20 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 
 import AuthDialog from "@/components/AuthDialog";
 import { useAuth } from "@/components/AuthProvider";
 
 import styles from "./page.module.css";
 
-type DictionaryLanguage = "python" | "html";
+// 只在展開範例時載入唯讀編輯器。
+const CodeExample = dynamic(() => import("@/components/CodeExample"), {
+  ssr: false,
+  loading: () => <p role="status">正在載入範例…</p>,
+});
+
+type DictionaryLanguage = "python" | "html" | "css";
 
 const DICTIONARY_LANGUAGES: {
   value: DictionaryLanguage;
@@ -15,6 +22,7 @@ const DICTIONARY_LANGUAGES: {
 }[] = [
   { value: "python", label: "Python" },
   { value: "html", label: "HTML" },
+  { value: "css", label: "CSS" },
 ];
 
 type SyntaxEntry = {
@@ -35,6 +43,61 @@ type MemberBookmarks = {
   ids: number[];
   error: boolean;
 };
+
+// 所有螢幕寬度皆以完整名稱換行；單個名稱太長時才縮字，最小保留 12px。
+function DictionaryName({
+  syntax,
+  hasUsed,
+  isExpanded,
+}: {
+  syntax: SyntaxEntry;
+  hasUsed: boolean;
+  isExpanded: boolean;
+}) {
+  const nameRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    const element = nameRef.current;
+    if (!element) return;
+    let active = true;
+    function fit() {
+      if (!active || !element) return;
+      const width = element.clientWidth;
+      const baseSize = parseFloat(getComputedStyle(element).fontSize);
+      for (const child of Array.from(element.children) as HTMLElement[]) {
+        child.style.removeProperty("font-size");
+        child.style.removeProperty("white-space");
+        if (width <= 0) continue;
+        const needed = child.scrollWidth;
+        if (needed > width) {
+          child.style.fontSize = `${Math.max(12, Math.floor((baseSize * width) / needed))}px`;
+          // 極長名稱不再縮小，改以換行保留完整文字。
+          if (child.scrollWidth > width) child.style.whiteSpace = "normal";
+        }
+      }
+    }
+    const observer = new ResizeObserver(fit);
+    observer.observe(element);
+    void document.fonts.ready.then(fit);
+    fit();
+    return () => {
+      active = false;
+      observer.disconnect();
+    };
+  }, [syntax.name, syntax.display_label, hasUsed, isExpanded]);
+
+  return (
+    <span
+      ref={nameRef}
+      className={`${styles.name} ${hasUsed ? styles.usedName : ""}`}
+    >
+      <span className={styles.englishName}>{syntax.name}</span>
+      {syntax.display_label && syntax.display_label !== syntax.name && (
+        <span className={styles.displayLabel}>· {syntax.display_label}</span>
+      )}
+    </span>
+  );
+}
 
 // 搜尋時忽略大小寫、全半形與排版空白
 function normalizeSearch(text: string) {
@@ -112,6 +175,7 @@ function compareDictionaryEntries(a: SyntaxEntry, b: SyntaxEntry) {
 }
 
 export default function DictionaryPage() {
+  const searchRef = useRef<HTMLInputElement>(null);
   const { user, isAuthLoading, authError, completeSignin } = useAuth();
   const [syntaxes, setSyntaxes] = useState<SyntaxEntry[]>([]);
   const [expandedSlug, setExpandedSlug] = useState<string | null>(null);
@@ -142,6 +206,57 @@ export default function DictionaryPage() {
   const [isBookmarkAuthOpen, setIsBookmarkAuthOpen] = useState(false);
 
   const bookmarkSavingRef = useRef(false);
+
+  // 依搜尋框實際可用寬度調整提示字級，不縮小使用者輸入的文字。
+  useEffect(() => {
+    const input = searchRef.current;
+    if (!input) return;
+    const fullPlaceholder = input.placeholder;
+    const narrow = window.matchMedia("(max-width: 440px)");
+    const context = document.createElement("canvas").getContext("2d");
+    let active = true;
+    function fitPlaceholder() {
+      if (!active || !input || !context) return;
+      input.style.removeProperty("--placeholder-size");
+      input.placeholder = fullPlaceholder;
+      if (!narrow.matches) return;
+      const style = getComputedStyle(input);
+      const width =
+        input.clientWidth -
+        parseFloat(style.paddingLeft) -
+        parseFloat(style.paddingRight);
+      const baseSize = parseFloat(style.fontSize);
+      context.font = `${style.fontWeight} ${baseSize}px ${style.fontFamily}`;
+      // 最小字級仍放不下時縮短提示，完整搜尋用途仍由輸入框標籤說明。
+      for (const candidate of [
+        fullPlaceholder,
+        "搜尋語法、中文或關鍵字",
+        "搜尋語法",
+      ]) {
+        input.placeholder = candidate;
+        const neededAtMinimum =
+          (context.measureText(candidate).width * 12) / baseSize;
+        if (neededAtMinimum <= width) break;
+      }
+      const needed = context.measureText(input.placeholder).width;
+      if (needed > width && width > 0) {
+        input.style.setProperty(
+          "--placeholder-size",
+          `${Math.max(12, Math.floor((baseSize * width) / needed))}px`,
+        );
+      }
+    }
+    const observer = new ResizeObserver(fitPlaceholder);
+    observer.observe(input);
+    narrow.addEventListener("change", fitPlaceholder);
+    void document.fonts.ready.then(fitPlaceholder);
+    fitPlaceholder();
+    return () => {
+      active = false;
+      observer.disconnect();
+      narrow.removeEventListener("change", fitPlaceholder);
+    };
+  }, []);
 
   // 只使用目前會員的收藏，避免切換帳號時顯示別人的資料
   const currentBookmarks =
@@ -305,7 +420,7 @@ export default function DictionaryPage() {
     ? syntaxes.filter((syntax) => currentBookmarks?.ids.includes(syntax.id))
     : syntaxes;
 
-  // 先跨語言搜尋；相同符合程度時，Python 優先，再依辭典排序。
+  // 先跨語言搜尋；相同符合程度時，依 Python、HTML、CSS 頁籤順序，再依辭典排序。
   const rankedSyntaxes = sourceSyntaxes
     .map((syntax) => ({
       syntax,
@@ -339,6 +454,7 @@ export default function DictionaryPage() {
       .length,
     html: matchingSyntaxes.filter((syntax) => syntax.language === "html")
       .length,
+    css: matchingSyntaxes.filter((syntax) => syntax.language === "css").length,
   };
 
   // 列表只顯示目前語言，保留上面已完成的搜尋排序。
@@ -443,6 +559,7 @@ export default function DictionaryPage() {
       >
         <div className={styles.searchRow}>
           <input
+            ref={searchRef}
             id="syntax-search"
             type="text"
             enterKeyHint="search"
@@ -608,13 +725,14 @@ export default function DictionaryPage() {
                   Boolean(
                     user && (!currentBookmarks || currentBookmarks.error),
                   );
-                const isExpanded = expandedSlug === syntax.slug;
-                const buttonId = `dictionary-button-${syntax.slug}`;
-                const panelId = `dictionary-panel-${syntax.slug}`;
+                const syntaxKey = `${syntax.language}-${syntax.slug}`;
+                const isExpanded = expandedSlug === syntaxKey;
+                const buttonId = `dictionary-button-${syntaxKey}`;
+                const panelId = `dictionary-panel-${syntaxKey}`;
 
                 return (
                   <li
-                    key={syntax.slug}
+                    key={syntaxKey}
                     className={`${styles.item} ${
                       isExpanded ? styles.expanded : ""
                     }`}
@@ -658,39 +776,41 @@ export default function DictionaryPage() {
                         aria-controls={panelId}
                         onClick={() => {
                           setExpandedSlug((current) =>
-                            current === syntax.slug ? null : syntax.slug,
+                            current === syntaxKey ? null : syntaxKey,
                           );
                         }}
                       >
-                        <span
-                          className={`${styles.name} ${
-                            hasUsed ? styles.usedName : ""
-                          }`}
-                        >
-                          {syntax.name}
-
-                          {syntax.display_label &&
-                            syntax.display_label !== syntax.name && (
-                              <span className={styles.displayLabel}>
-                                {"　· "}
-                                {syntax.display_label}
-                              </span>
-                            )}
-                        </span>
+                        <DictionaryName
+                          syntax={syntax}
+                          hasUsed={hasUsed}
+                          isExpanded={isExpanded}
+                        />
 
                         {!isAuthLoading && user && (
                           <span
                             className={`${styles.usage} ${
-                              hasUsed ? styles.usedUsage : ""
+                              hasUsed
+                                ? styles.usedUsage
+                                : currentUsage && !currentUsage.error
+                                  ? styles.unusedUsage
+                                  : ""
                             }`}
                           >
-                            {!currentUsage
-                              ? "載入中…"
-                              : currentUsage.error
-                                ? "次數載入失敗"
-                                : hasUsed
-                                  ? `✓ 已使用 ${usageCount} 次`
-                                  : "○ 尚未使用"}
+                            {!currentUsage ? (
+                              "載入中…"
+                            ) : currentUsage.error ? (
+                              "次數載入失敗"
+                            ) : hasUsed ? (
+                              <>
+                                ✓ 已使用
+                                <span className={styles.usageCount}>
+                                  {" "}
+                                  {usageCount} 次
+                                </span>
+                              </>
+                            ) : (
+                              "○ 尚未使用"
+                            )}
                           </span>
                         )}
 
@@ -709,9 +829,11 @@ export default function DictionaryPage() {
                         <h3>語法解釋：</h3>
                         <p>{syntax.summary}</p>
 
-                        <pre>
-                          <code>{syntax.example_code}</code>
-                        </pre>
+                        {isExpanded && syntax.example_code && (
+                          <div className={styles.codeExample}>
+                            <CodeExample value={syntax.example_code} />
+                          </div>
+                        )}
                         {syntax.source_url?.startsWith("https://") && (
                           <a
                             className={styles.sourceLink}

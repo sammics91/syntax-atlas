@@ -15,8 +15,28 @@ const CodeEditor = dynamic(() => import("@/components/CodeEditor"), {
   loading: () => <p role="status">正在載入編輯器…</p>,
 });
 
+// 分析結果展開時才載入唯讀範例，不影響首頁輸入編輯器。
+const CodeExample = dynamic(() => import("@/components/CodeExample"), {
+  ssr: false,
+  loading: () => <p role="status">正在載入範例…</p>,
+});
+
+// 首頁支援的語言與顯示名稱。
+const LANGUAGE_LABELS = {
+  python: "Python",
+  html: "HTML",
+  css: "CSS",
+} as const;
+
+type AnalysisLanguage = keyof typeof LANGUAGE_LABELS;
+
+function isAnalysisLanguage(value: unknown): value is AnalysisLanguage {
+  return typeof value === "string" && Object.hasOwn(LANGUAGE_LABELS, value);
+}
+
 // 分析結果的型別
 type SyntaxResult = {
+  language: AnalysisLanguage;
   slug: string;
   name: string;
   display_label: string | null;
@@ -26,17 +46,64 @@ type SyntaxResult = {
 };
 
 type AnalysisError = {
+  language?: AnalysisLanguage;
   message: string;
   line: number | null;
   column: number | null;
 };
 
 type AnalysisResult = {
-  language: string;
+  language: AnalysisLanguage;
   valid: boolean;
   syntaxes: SyntaxResult[];
   errors: AnalysisError[];
 };
+
+// 所有螢幕寬度皆以完整名稱換行；單個名稱太長時才縮字，最小保留 12px。
+function HomeSyntaxName({ syntax }: { syntax: SyntaxResult }) {
+  const nameRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    const element = nameRef.current;
+    if (!element) return;
+    let active = true;
+    function fit() {
+      if (!active || !element) return;
+      const width = element.clientWidth;
+      const baseSize = parseFloat(getComputedStyle(element).fontSize);
+      for (const child of Array.from(element.children) as HTMLElement[]) {
+        child.style.removeProperty("font-size");
+        child.style.removeProperty("white-space");
+        if (width <= 0) continue;
+        const needed = child.scrollWidth;
+        if (needed > width) {
+          child.style.fontSize = `${Math.max(12, Math.floor((baseSize * width) / needed))}px`;
+          // 極長名稱不再縮小，改以換行保留完整文字。
+          if (child.scrollWidth > width) child.style.whiteSpace = "normal";
+        }
+      }
+    }
+    const observer = new ResizeObserver(fit);
+    observer.observe(element);
+    void document.fonts.ready.then(fit);
+    fit();
+    return () => {
+      active = false;
+      observer.disconnect();
+    };
+  }, [syntax.name, syntax.display_label]);
+
+  return (
+    <span ref={nameRef} className={styles.syntaxName}>
+      <span className={styles.syntaxEnglishName}>{syntax.name}</span>
+      {syntax.display_label && syntax.display_label !== syntax.name && (
+        <span className={styles.syntaxDisplayLabel}>
+          · {syntax.display_label}
+        </span>
+      )}
+    </span>
+  );
+}
 
 export default function HomePage() {
   return (
@@ -134,7 +201,7 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
           String(data.id) !== recordId ||
           typeof data.record_number !== "number" ||
           typeof data.code !== "string" ||
-          (data.language !== "python" && data.language !== "html")
+          !isAnalysisLanguage(data.language)
         ) {
           throw new Error("紀錄內容格式異常，無法開啟編輯。");
         }
@@ -230,10 +297,14 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
       // 檢查回傳資料的基本結構
       if (
         !data ||
-        typeof data.language !== "string" ||
+        !isAnalysisLanguage(data.language) ||
         typeof data.valid !== "boolean" ||
         !Array.isArray(data.syntaxes) ||
-        !Array.isArray(data.errors)
+        !Array.isArray(data.errors) ||
+        !data.syntaxes.every(
+          (syntax: SyntaxResult) =>
+            syntax && isAnalysisLanguage(syntax.language),
+        )
       ) {
         setError("分析結果格式異常，請稍後再試。");
         return;
@@ -241,12 +312,13 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
 
       const analysis: AnalysisResult = data;
 
-      // 檢查是否符合所選語言的語法
+      // 檢查語法；HTML 內嵌 CSS 的錯誤依回傳的語言顯示。
       if (!analysis.valid) {
         const firstError = analysis.errors[0];
         const location = firstError?.line ? `第 ${firstError.line} 行：` : "";
 
-        const languageName = analysis.language === "python" ? "Python" : "HTML";
+        const languageName =
+          LANGUAGE_LABELS[firstError?.language ?? analysis.language];
 
         setError(
           `無法以 ${languageName} 語法解析。${location}${
@@ -538,7 +610,15 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
             </h2>
 
             <span>
-              {result.language === "python" ? "Python" : "HTML"}
+              {[
+                ...new Set(
+                  result.syntaxes.length > 0
+                    ? result.syntaxes.map((syntax) => syntax.language)
+                    : [result.language],
+                ),
+              ]
+                .map((language) => LANGUAGE_LABELS[language])
+                .join(" / ")}
               {" · 共 "}
               {result.syntaxes.length} 種
             </span>
@@ -551,12 +631,13 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
           ) : (
             <ul className={styles.syntaxList}>
               {result.syntaxes.map((syntax) => {
-                const isExpanded = expandedSlug === syntax.slug;
-                const buttonId = `syntax-button-${syntax.slug}`;
-                const panelId = `syntax-panel-${syntax.slug}`;
+                const syntaxKey = `${syntax.language}-${syntax.slug}`;
+                const isExpanded = expandedSlug === syntaxKey;
+                const buttonId = `syntax-button-${syntaxKey}`;
+                const panelId = `syntax-panel-${syntaxKey}`;
 
                 return (
-                  <li key={syntax.slug} className={styles.syntaxItem}>
+                  <li key={syntaxKey} className={styles.syntaxItem}>
                     <button
                       id={buttonId}
                       type="button"
@@ -565,20 +646,11 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
                       aria-controls={panelId}
                       onClick={() => {
                         setExpandedSlug((current) =>
-                          current === syntax.slug ? null : syntax.slug,
+                          current === syntaxKey ? null : syntaxKey,
                         );
                       }}
                     >
-                      <span className={styles.syntaxName}>
-                        {syntax.name}
-                        {syntax.display_label &&
-                          syntax.display_label !== syntax.name && (
-                            <span>
-                              {"　· "}
-                              {syntax.display_label}
-                            </span>
-                          )}
-                      </span>
+                      <HomeSyntaxName syntax={syntax} />
 
                       <span className={styles.syntaxCount}>
                         {syntax.count} 次
@@ -599,9 +671,11 @@ function HomeEditor({ recordId }: { recordId: string | null }) {
                       <h3>語法解釋</h3>
                       <p>{syntax.summary}</p>
 
-                      <pre>
-                        <code>{syntax.example_code}</code>
-                      </pre>
+                      {isExpanded && syntax.example_code && (
+                        <div className={styles.codeExample}>
+                          <CodeExample value={syntax.example_code} />
+                        </div>
+                      )}
                     </div>
                   </li>
                 );

@@ -2,12 +2,19 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 
 import { useAuth } from "@/components/AuthProvider";
 
 import styles from "./page.module.css";
 
-type StatisticsLanguage = "python" | "html";
+// 只在展開語法說明時載入唯讀範例。
+const CodeExample = dynamic(() => import("@/components/CodeExample"), {
+  ssr: false,
+  loading: () => <p role="status">正在載入範例…</p>,
+});
+
+type StatisticsLanguage = "python" | "html" | "css";
 
 const STATISTICS_LANGUAGES: {
   value: StatisticsLanguage;
@@ -15,6 +22,7 @@ const STATISTICS_LANGUAGES: {
 }[] = [
   { value: "python", label: "Python" },
   { value: "html", label: "HTML" },
+  { value: "css", label: "CSS" },
 ];
 
 type SyntaxUsage = {
@@ -57,6 +65,83 @@ export default function StatisticsPage() {
   const [isBookmarkSaving, setIsBookmarkSaving] = useState(false);
   const [bookmarkNotice, setBookmarkNotice] = useState("");
   const bookmarkSavingRef = useRef(false);
+  const languageOverviewRef = useRef<HTMLDivElement>(null);
+
+  // 用原占比寬度判斷是否改用左右切換，避免切換模式後反覆跳動。
+  useEffect(() => {
+    const overview = languageOverviewRef.current;
+    if (!overview) return;
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    if (!context) return;
+    let active = true;
+    function fitTabs() {
+      if (!active || !overview || !context) return;
+      const tabs = Array.from(
+        overview.querySelectorAll<HTMLButtonElement>("button[data-count]"),
+      );
+      const total = tabs.reduce(
+        (sum, tab) => sum + Number(tab.dataset.count),
+        0,
+      );
+      const width = overview.clientWidth;
+      if (!total || !width) return;
+      const tabsOverflow = (twoLines: boolean) => {
+        overview.dataset.stacked = String(twoLines);
+        return tabs.some((tab) => {
+          const label = tab.firstElementChild as HTMLElement;
+          const style = getComputedStyle(label);
+          // 預留加粗選取狀態，切換語言時不因字寬改變而跳動。
+          context.font = `700 ${style.fontSize} ${style.fontFamily}`;
+          const parts = Array.from(label.children).map(
+            (part) => part.textContent ?? "",
+          );
+          const textWidth = twoLines
+            ? Math.max(...parts.map((part) => context.measureText(part).width))
+            : context.measureText(parts.join(" ")).width;
+          const needed =
+            textWidth +
+            parseFloat(style.paddingLeft) +
+            parseFloat(style.paddingRight) +
+            8;
+          return needed > (width * Number(tab.dataset.count)) / total;
+        });
+      };
+      // 依實際文字寬度依序嘗試單行、兩行，最後才改用左右切換。
+      const needsCompactTabs = tabsOverflow(false) && tabsOverflow(true);
+      overview.dataset.compact = String(needsCompactTabs);
+      // 小色塊保留真實寬度；百分比先縮至最低 10px，仍放不下才隱藏。
+      for (const segment of overview.querySelectorAll<HTMLButtonElement>(
+        "button[data-share]",
+      )) {
+        const label = segment.firstElementChild as HTMLElement;
+        label.style.removeProperty("font-size");
+        const style = getComputedStyle(label);
+        const baseSize = parseFloat(style.fontSize);
+        context.font = `700 ${style.fontSize} ${style.fontFamily}`;
+        const textWidth = context.measureText(label.textContent ?? "").width;
+        const availableWidth = Math.max(0, segment.clientWidth - 8);
+        const fontSize = Math.max(
+          10,
+          Math.min(baseSize, (baseSize * availableWidth) / (textWidth || 1)),
+        );
+        label.style.fontSize = `${fontSize}px`;
+        label.dataset.visible = String(
+          (textWidth * fontSize) / baseSize <= availableWidth,
+        );
+      }
+    }
+    const observer = new ResizeObserver(fitTabs);
+    observer.observe(overview);
+    window.addEventListener("resize", fitTabs);
+    void document.fonts.ready.then(fitTabs);
+    fitTabs();
+    return () => {
+      active = false;
+      observer.disconnect();
+      window.removeEventListener("resize", fitTabs);
+    };
+  }, [statistics, isLoading, error]);
 
   const currentBookmarks =
     memberBookmarks?.userId === userId ? memberBookmarks : null;
@@ -199,7 +284,7 @@ export default function StatisticsPage() {
       percentage: (language.count / totalCount) * 100,
     }));
 
-  // 若會員只有 HTML 紀錄，直接選取 HTML。
+  // 未手動選取時，顯示使用次數最多的語言；也適用僅有 HTML 或 CSS 的會員。
   const activeLanguage = languageTabs.some(
     (language) => language.value === selectedLanguage,
   )
@@ -209,6 +294,17 @@ export default function StatisticsPage() {
   const activeLanguageLabel =
     STATISTICS_LANGUAGES.find((language) => language.value === activeLanguage)
       ?.label ?? "Python";
+
+  // 左右依占比排名循環切換，按鈕預告下一個會顯示的語言。
+  const activeLanguageIndex = languageTabs.findIndex(
+    (language) => language.value === activeLanguage,
+  );
+  const previousLanguage =
+    languageTabs[
+      (activeLanguageIndex - 1 + languageTabs.length) % languageTabs.length
+    ];
+  const nextLanguage =
+    languageTabs[(activeLanguageIndex + 1) % languageTabs.length];
 
   // API 已按次數排序，篩選語言後保留原本順序。
   const usages = allUsages.filter(
@@ -313,18 +409,36 @@ export default function StatisticsPage() {
         >
           {languageTabs.length > 0 && (
             <div
+              ref={languageOverviewRef}
               className={styles.languageOverview}
               role="group"
               aria-label="語言占比與排名切換"
             >
-              <div className={styles.languageTrack} aria-hidden="true">
+              <div
+                className={styles.languageTrack}
+                role="group"
+                aria-label="點選占比色塊切換語言"
+              >
                 {languageTabs.map((language) => (
-                  <div
+                  <button
+                    type="button"
                     key={language.value}
                     className={styles.languageSegment}
                     data-language={language.value}
+                    data-share={language.count}
                     style={{ flexGrow: language.count }}
-                  />
+                    aria-pressed={activeLanguage === language.value}
+                    aria-label={`${language.label}，占 ${Math.round(language.percentage * 10) / 10}%`}
+                    title={`${language.label} ${Math.round(language.percentage * 10) / 10}%`}
+                    onClick={() => {
+                      setSelectedLanguage(language.value);
+                      setExpandedSyntaxId(null);
+                    }}
+                  >
+                    <span className={styles.segmentPercentage}>
+                      {Math.round(language.percentage * 10) / 10}%
+                    </span>
+                  </button>
                 ))}
               </div>
 
@@ -342,6 +456,7 @@ export default function StatisticsPage() {
                           : ""
                       }`}
                       data-language={language.value}
+                      data-count={language.count}
                       style={{ flexGrow: language.count }}
                       aria-pressed={activeLanguage === language.value}
                       aria-label={`${language.label}，占 ${percentage}%`}
@@ -352,11 +467,52 @@ export default function StatisticsPage() {
                       }}
                     >
                       <span className={styles.languageTabLabel}>
-                        {language.label} {percentage}%
+                        <span>{language.label}</span>{" "}
+                        <span className={styles.languagePercentage}>
+                          {percentage}%
+                        </span>
                       </span>
                     </button>
                   );
                 })}
+              </div>
+              <div className={styles.compactTabs}>
+                <button
+                  type="button"
+                  className={`${styles.languageTab} ${styles.neighborTab}`}
+                  disabled={languageTabs.length < 2}
+                  aria-label={`切換至上一個語言：${previousLanguage?.label ?? activeLanguageLabel}`}
+                  onClick={() => {
+                    if (!previousLanguage) return;
+                    setSelectedLanguage(previousLanguage.value);
+                    setExpandedSyntaxId(null);
+                  }}
+                >
+                  <span aria-hidden="true">‹</span>
+                  <span>{previousLanguage?.label}</span>
+                </button>
+                <div
+                  className={`${styles.languageTab} ${styles.currentTab}`}
+                  data-rank={activeLanguageIndex}
+                  aria-live="polite"
+                  aria-atomic="true"
+                >
+                  {activeLanguageLabel}
+                </div>
+                <button
+                  type="button"
+                  className={`${styles.languageTab} ${styles.neighborTab}`}
+                  disabled={languageTabs.length < 2}
+                  aria-label={`切換至下一個語言：${nextLanguage?.label ?? activeLanguageLabel}`}
+                  onClick={() => {
+                    if (!nextLanguage) return;
+                    setSelectedLanguage(nextLanguage.value);
+                    setExpandedSyntaxId(null);
+                  }}
+                >
+                  <span>{nextLanguage?.label}</span>
+                  <span aria-hidden="true">›</span>
+                </button>
               </div>
             </div>
           )}
@@ -480,10 +636,10 @@ export default function StatisticsPage() {
 
                           <p>{syntax.summary}</p>
 
-                          {syntax.example_code && (
-                            <pre>
-                              <code>{syntax.example_code}</code>
-                            </pre>
+                          {isExpanded && syntax.example_code && (
+                            <div className={styles.codeExample}>
+                              <CodeExample value={syntax.example_code} />
+                            </div>
                           )}
                         </div>
                       </div>

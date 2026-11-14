@@ -318,6 +318,24 @@ textarea::placeholder {
     gap: 10px;
   }
 
+  /* 會員資訊按鈕：640px 以下改用人像圖示，避免名稱擠到副標題。 */
+  .account-name.account-profile-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+  }
+
+  .profile-name {
+    display: none;
+  }
+
+  .profile-icon {
+    display: block;
+  }
+
   .login-button {
     padding: 6px 10px;
     font-size: 14px;
@@ -387,24 +405,6 @@ textarea::placeholder {
   /* 隱藏訪客文字 */
   .account-name {
     display: none;
-  }
-
-  /* 會員資訊按鈕：顯示人像圖示 */
-  .account-profile-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    padding: 0;
-  }
-
-  .profile-name {
-    display: none;
-  }
-
-  .profile-icon {
-    display: block;
   }
 
   /* 未登入時，登入／註冊簡化成登入 */

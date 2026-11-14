@@ -5,6 +5,7 @@ from html.parser import HTMLParser
 import html5lib
 import requests
 
+from analyzer_css import CSSValidationError, analyze_css
 from database import get_db_connection
 
 
@@ -82,6 +83,16 @@ class HTMLEmbeddedCodeParser(HTMLParser):
         self.current_block = None
 
     def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+        inline_style = attributes.get("style")
+        if inline_style and inline_style.strip():
+            self.blocks.append({
+                "language": "css",
+                "code": inline_style,
+                "mode": "declarations",
+                "line": self.getpos()[0],
+                "column": None,
+            })
         if tag not in {"style", "script"}:
             return
 
@@ -117,7 +128,17 @@ class HTMLEmbeddedCodeParser(HTMLParser):
             "tag": tag,
             "language": language,
             "parts": [],
+            "line": self.getpos()[0] + self.get_starttag_text().count("\n"),
+            "column": (
+                self.getpos()[1] + len(self.get_starttag_text())
+                if "\n" not in self.get_starttag_text()
+                else len(self.get_starttag_text().rsplit("\n", 1)[1])
+            ),
         }
+
+    def handle_startendtag(self, tag, attrs):
+        self.handle_starttag(tag, attrs)
+        self.handle_endtag(tag)
 
     def handle_data(self, data):
         if self.current_block is not None:
@@ -137,6 +158,9 @@ class HTMLEmbeddedCodeParser(HTMLParser):
                 {
                     "language": self.current_block["language"],
                     "code": code,
+                    "mode": "stylesheet",
+                    "line": self.current_block["line"],
+                    "column": self.current_block["column"],
                 }
             )
 
@@ -441,3 +465,36 @@ def analyze_html(
         }
         for syntax_id in ordered_ids
     ]
+
+
+def analyze_html_with_css(code, *, mode="auto", context="div"):
+    """HTML 驗證通過後，分析實際寫出的樣式；相同語法合併次數。"""
+    syntaxes = analyze_html(code, mode=mode, context=context)
+    for block in extract_embedded_code(code):
+        if block["language"] != "css":
+            continue
+        try:
+            syntaxes.extend(analyze_css(block["code"], mode=block["mode"]))
+        except CSSValidationError as error:
+            errors = []
+            for detail in error.errors:
+                local_line = detail.get("line")
+                column = detail.get("column")
+                if block["mode"] == "declarations":
+                    # 屬性值經 HTML 字元解碼，不能假裝欄位仍精準對應原文。
+                    line, column = block["line"], None
+                else:
+                    line = block["line"] + local_line - 1 if local_line else None
+                    if local_line == 1 and column is not None:
+                        column += block["column"]
+                errors.append({**detail, "language": "css", "line": line, "column": column})
+            raise CSSValidationError(errors) from error
+
+    merged = {}
+    for syntax in syntaxes:
+        key = (syntax["language"], syntax["syntax_id"])
+        if key not in merged:
+            merged[key] = dict(syntax)
+        else:
+            merged[key]["count"] += syntax["count"]
+    return sorted(merged.values(), key=lambda item: (-item["count"], item["name"], item["syntax_id"]))
